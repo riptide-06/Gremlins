@@ -63,6 +63,10 @@ consented outbound outreach, or SLIM transport is implemented.
 
 ## Cloud Run direction
 
+Live onboarding: **https://gremlin-331254975906.us-west1.run.app**.
+Google login is **Internal, UCSC-only**. Use synthetic data for this pilot.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment and verification record.
+
 Target project: `gremlins-511221`. `cloud_app.py` implements verified UCSC Google
 login, a small onboarding page issuing copy-pasteable scoped agent credentials,
 Firestore-backed per-student memory, HTTPS A2A, and redacted Cloud Logging.

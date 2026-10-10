@@ -258,7 +258,7 @@ def page(title, body):
     return HTMLResponse("""<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Gremlin</title>
 <style>body{background:#f5f7ef;color:#24372e;font:16px system-ui;max-width:760px;margin:60px auto;padding:0 24px;line-height:1.65}h1{font-size:42px;letter-spacing:-2px}h2{font-size:20px}button,a.button{display:inline-block;background:#234f3c;color:white;border:0;border-radius:8px;padding:12px 18px;font:inherit;text-decoration:none;cursor:pointer}section{background:white;border:1px solid #dde4d5;border-radius:14px;padding:24px;margin:24px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef2e8;padding:18px;border-radius:8px;font-size:13px}.muted{color:#657366;font-size:13px}form{margin:14px 0}</style>
-<div class="muted">GREMLIN · IN YOUR CORNER</div><h1>""" + escape(title) + "</h1>" + body + "</html>", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
+<div class="muted">GREMLIN · IN YOUR CORNER</div><h1>""" + escape(title) + "</h1>" + body + "</html>", headers={"Cache-Control": "no-store", "Referrer-Policy": "same-origin", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
 
 
 def create_app(settings=None, store=None):
@@ -370,7 +370,7 @@ def create_app(settings=None, store=None):
     handler = DefaultRequestHandler(agent_executor=Executor(store, settings), task_store=InMemoryTaskStore(), agent_card=card)
     app = Starlette(routes=[Route("/", home), Route("/login", login), Route("/auth/callback", callback),
                             Route("/credentials", credentials, methods=["POST"]), Route("/revoke", revoke, methods=["POST"]),
-                            Route("/logout", logout, methods=["POST"]), Route("/gremlin_client.py", download), Route("/healthz", health),
+                            Route("/logout", logout, methods=["POST"]), Route("/gremlin_client.py", download), Route("/health", health), Route("/healthz", health),
                             *create_agent_card_routes(card), *create_jsonrpc_routes(handler, "/a2a")])
     # An unconfigured service can expose health/discovery, but cannot log in.
     # The random fallback is not a usable production session configuration.

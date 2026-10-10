@@ -1,5 +1,10 @@
 # Cloud Run pilot
 
+Deployed service: **https://gremlin-331254975906.us-west1.run.app**.
+Google OAuth audience is **Internal**, under the UCSC organization. Both the
+provider's audience restriction and the application's verified-domain checks
+remain enabled. OAuth configuration is created; secrets live in Secret Manager.
+
 Only use project **gremlins-511221** (number **331254975906**). This guide does
 not change the global gcloud project. Weekend budget: $10 target, not a hard cap.
 Run commands from this repository. No local prototype memory or credentials
@@ -59,14 +64,14 @@ gcloud iam service-accounts create gremlin-runtime --display-name='Gremlin Cloud
 gcloud projects add-iam-policy-binding gremlins-511221 --member='serviceAccount:gremlin-runtime@gremlins-511221.iam.gserviceaccount.com' --role=roles/datastore.user
 ```
 
-The runtime identity needs Firestore access, not Owner/Editor. Source deployment
-also needs a build identity with the documented Cloud Run source-build roles;
-inspect the actual build identity rather than blindly granting broad roles.
+The runtime identity needs Firestore access, not Owner/Editor. This deployment
+uses a separate `gremlin-build` service account with `roles/run.builder`, not
+the runtime identity. Allow IAM grants to propagate before the first build.
 
 ## 3. Deploy the unconfigured service to obtain its URL
 
 ```sh
-gcloud run deploy gremlin --source=. --region=us-west1 --project=gremlins-511221 --service-account=gremlin-runtime@gremlins-511221.iam.gserviceaccount.com --allow-unauthenticated --min-instances=0 --max-instances=1 --concurrency=20 --cpu=1 --memory=512Mi --timeout=30 --set-env-vars=GOOGLE_CLOUD_PROJECT=gremlins-511221,ALLOWED_DOMAIN=ucsc.edu
+gcloud run deploy gremlin --source=. --region=us-west1 --project=gremlins-511221 --service-account=gremlin-runtime@gremlins-511221.iam.gserviceaccount.com --build-service-account=projects/gremlins-511221/serviceAccounts/gremlin-build@gremlins-511221.iam.gserviceaccount.com --allow-unauthenticated --min=0 --max=1 --max-instances=1 --concurrency=20 --cpu=1 --memory=512Mi --timeout=30 --set-env-vars=GOOGLE_CLOUD_PROJECT=gremlins-511221,ALLOWED_DOMAIN=ucsc.edu
 gcloud run services describe gremlin --region=us-west1 --project=gremlins-511221 --format='value(status.url)'
 ```
 
@@ -79,9 +84,8 @@ Set `PUBLIC_URL` to the returned HTTPS URL before testing discovery/login.
 
 In Google Cloud Console, select **gremlins-511221**, then Google Auth Platform:
 
-1. Configure branding and an appropriate audience. Use Internal only if this
-   project is eligible under the UCSC organization. Otherwise use External in
-   Testing and add Adam and Tarun's UCSC accounts as test users.
+1. Keep branding and the audience **Internal**: this project belongs to the
+   UCSC organization. Do not switch to External to work around a sign-in problem.
 2. Request only `openid` and `email`.
 3. Create a **Web application** OAuth client, not a desktop or service account.
 4. Add the exact redirect URI: `https://SERVICE-URL/auth/callback`.
@@ -124,6 +128,10 @@ Google's callback code is handled in a redirect query; restrict log access and
 retention appropriately. Application logs do not emit callback query strings.
 
 ## Cost and teardown
+
+There is a project-specific $10 custom-period budget for October 10–13, 2026,
+with default billing-admin alerts at 50%, 90%, and 100%. It is not a hard cap.
+The budget ID is `3e0a1fee-6b24-4197-99c2-bd85680a2e2e`.
 
 Keep scale-to-zero and one maximum instance. Firestore has separate billing;
 the notebook cap bounds storage per student, not total spend. Check project

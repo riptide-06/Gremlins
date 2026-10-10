@@ -142,9 +142,12 @@ async def test_login_issues_credentials_only_after_csrf_and_rotates(setup):
         csrf = re.search(r'name="csrf" value="([^"]+)"', html).group(1)
         assert (await http.post("/credentials", data={"csrf": "wrong"})).status_code == 403
         assert (await http.post("/credentials", data={"csrf": csrf}, headers={"Origin": "https://attacker.invalid"})).status_code == 403
-        response = await http.post("/credentials", data={"csrf": csrf})
+        assert (await http.post("/credentials", data={"csrf": csrf}, headers={"Origin": "null"})).status_code == 403
+        response = await http.post("/credentials", data={"csrf": csrf}, headers={"Origin": "http://test"})
         assert "Paste into your own agent" in response.text
         assert response.headers["cache-control"] == "no-store"
+        # no-referrer would suppress Origin on real HTML form POSTs.
+        assert response.headers["referrer-policy"] == "same-origin"
         token = re.search(r'Your student bearer token: ([\w-]+)', response.text).group(1)
         assert store.authorize(token)["uid"] == digest("google-subject")
         await http.post("/revoke", data={"csrf": csrf})
@@ -165,6 +168,7 @@ async def test_non_campus_login_denied(setup, bad):
 async def test_public_routes_never_expose_state(setup):
     app, _, _, _ = setup
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+        assert (await http.get("/health")).json() == {"ok": True}
         assert (await http.get("/.well-known/agent-card.json")).status_code == 200
         assert (await http.get("/gremlin_client.py")).status_code == 200
         for path in ("/.gremlin-keys.json", "/student-notebook.md", "/.env"):
