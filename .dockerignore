@@ -4,3 +4,5 @@
 !uv.lock
 !cloud_app.py
 !gremlin_client.py
+!gremlin_slim.py
+!SLIM.md

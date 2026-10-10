@@ -57,7 +57,8 @@ This local version is a **synthetic demonstration**, not production security:
 plaintext HTTP, shared role credentials, host-readable files, and in-memory A2A
 tasks. The host can inspect the notebook. Agent clients may retain conversations
 and tool results. No model, Google Docs integration, student service accounts,
-consented outbound outreach, or SLIM transport is implemented.
+or consented outbound outreach is implemented. Optional SLIM transport is
+provided by a separate gateway, described below.
 
 `gremlin_a2a.py` preserves the earlier minimal A2A echo proof.
 
@@ -82,3 +83,10 @@ Without OAuth configuration, the local page explains that login is not yet
 configured. See [CLOUD_RUN.md](CLOUD_RUN.md) for configuration, deployment,
 privacy boundaries, costs, and cleanup. Tests use a fake repository, not real
 Firestore or Google login. Real cloud/OAuth integration requires deployment.
+
+## Optional SLIM transport
+
+`gremlin_slim.py` connects agents over AGNTCY SLIM SlimRPC and forwards A2A to
+the same permissioned backend. It runs separately, with no change to Cloud Run
+or the core dependencies. Student/advisor permissions remain backend-enforced.
+See [SLIM.md](SLIM.md) for a three-terminal laptop demo and security boundaries.

@@ -2,6 +2,7 @@
 import json
 import asyncio
 import re
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -171,8 +172,23 @@ async def test_public_routes_never_expose_state(setup):
         assert (await http.get("/health")).json() == {"ok": True}
         assert (await http.get("/.well-known/agent-card.json")).status_code == 200
         assert (await http.get("/gremlin_client.py")).status_code == 200
+        slim = await http.get("/gremlin_slim.py")
+        assert slim.status_code == 200 and "slima2a==0.7.1" in slim.text
+        assert slim.headers["x-content-type-options"] == "nosniff"
+        assert (await http.get("/SLIM.md")).status_code == 200
         for path in ("/.gremlin-keys.json", "/student-notebook.md", "/.env"):
             assert (await http.get(path)).status_code == 404
+
+
+def test_downloads_are_in_deployment_package():
+    root = Path(__file__).parent
+    dockerfile = (root / "Dockerfile").read_text()
+    copies = [line.split()[1:-1] for line in dockerfile.splitlines()
+              if line.startswith("COPY ") and "--from=" not in line]
+    for asset in ("cloud_app.py", "gremlin_client.py", "gremlin_slim.py", "SLIM.md"):
+        assert any(asset in files for files in copies), f"Missing Docker image asset: {asset}"
+        for ignore in (".dockerignore", ".gcloudignore"):
+            assert "!" + asset in (root / ignore).read_text().splitlines()
 
 
 async def test_concurrent_caller_identity_does_not_bleed(setup):

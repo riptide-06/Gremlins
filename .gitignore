@@ -6,6 +6,7 @@ student-notebook.md
 *credentials*.json
 *service-account*.json
 client_secret*.json
+.slim-demo-secret
 __pycache__/
 .pytest_cache/
 .venv/

@@ -20,7 +20,7 @@
 
 ## Verification completed
 
-- 14 local tests pass on Python 3.12.
+- 15 core tests and 9 isolated SLIM gateway tests pass on Python 3.12.
 - GitHub Actions passes.
 - Actual Firestore transactions, token issuance/authorization/revocation, and
   separation of auth metadata from notebook contents tested with synthetic data.
@@ -46,6 +46,26 @@
 - A second UCSC user signs in independently and sees a separate memory space.
 - Real Claude.ai connector requires the separate MCP/OAuth adapter described
   in `CLAUDE.md`; it is not implemented.
+
+## Optional SLIM transport
+
+`gremlin_slim.py` provides a separate A2A-over-SLIM SlimRPC gateway and client.
+`SLIM.md` documents a laptop node/gateway setup. The public service distributes
+both files and links them from the authenticated dashboard and agent card.
+This is **not** a hosted public SLIM relay: the gateway forwards to the live
+HTTPS A2A service, which retains all identity, role, expiry, and revocation
+checks. No new cloud resources or always-on instances were created.
+
+The official SLIM adapter uses an older A2A SDK, so its dependencies are
+isolated in uv script environments, not installed in the Cloud Run image.
+
+Live native SLIM node/gateway/client acceptance checks completed against the
+production backend: student remember/read, advisor contribution and denied
+read, separate notebooks for two synthetic users, and revocation rejection for
+both roles. Only the acceptance test's synthetic records were removed afterward.
+Revision `gremlin-00006-j7f` serves the SLIM download and setup document; both
+match the checkout. Health, discovery, SLIM student hello, and advisor read
+denial were rechecked after deployment. The runtime dependencies are unchanged.
 
 This is a synthetic-data hackathon pilot, not an institutionally approved
 service for health, immigration, or other sensitive student records.
