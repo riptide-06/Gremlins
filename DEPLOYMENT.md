@@ -35,11 +35,14 @@
 - Browser testing caught an Origin/Referrer-Policy conflict on form submission.
   Policy changed to `same-origin`; cross-origin/null-origin requests remain
   rejected and CSRF tokens remain required.
+- Browser credential issuance retested successfully after the fix. The actual
+  Google-login-issued student credential completed A2A hello/read, and its
+  advisor credential was denied read access. No notebook contents were printed
+  or modified in that acceptance test.
+- Live `/health` returns HTTP 200.
 
 ## Remaining acceptance checks
 
-- Retest real browser credential issuance after the Referrer-Policy fix, then
-  use those credentials over A2A.
 - A second UCSC user signs in independently and sees a separate memory space.
 - Real Claude.ai connector requires the separate MCP/OAuth adapter described
   in `CLAUDE.md`; it is not implemented.
