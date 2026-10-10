@@ -5,6 +5,7 @@ student-notebook.md
 !.env.example
 *credentials*.json
 *service-account*.json
+client_secret*.json
 __pycache__/
 .pytest_cache/
 .venv/

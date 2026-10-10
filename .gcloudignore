@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!cloud_app.py
+!gremlin_client.py

@@ -63,7 +63,18 @@ consented outbound outreach, or SLIM transport is implemented.
 
 ## Cloud Run direction
 
-Target project: `gremlins-511221`. Next: verified UCSC Google login, a small
-onboarding page issuing copy-pasteable scoped agent credentials, Firestore-backed
-per-student memory, HTTPS A2A, and redacted Cloud Logging. Local test data and
-credentials are not migrated.
+Target project: `gremlins-511221`. `cloud_app.py` implements verified UCSC Google
+login, a small onboarding page issuing copy-pasteable scoped agent credentials,
+Firestore-backed per-student memory, HTTPS A2A, and redacted Cloud Logging.
+Local test data and credentials are not migrated.
+
+```sh
+uv sync
+uv run pytest -q
+uv run uvicorn cloud_app:app --port 8080 --no-access-log
+```
+
+Without OAuth configuration, the local page explains that login is not yet
+configured. See [CLOUD_RUN.md](CLOUD_RUN.md) for configuration, deployment,
+privacy boundaries, costs, and cleanup. Tests use a fake repository, not real
+Firestore or Google login. Real cloud/OAuth integration requires deployment.
