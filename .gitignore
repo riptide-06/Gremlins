@@ -1,0 +1,11 @@
+.gremlin-keys.json
+student-notebook.md
+.env
+.env.*
+!.env.example
+*credentials*.json
+*service-account*.json
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
