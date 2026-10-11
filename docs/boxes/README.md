@@ -4,8 +4,15 @@ A box is one Markdown file (an export of a Google Doc) that is the *only*
 thing a gremlin reasons from. Department boxes are read-only policy. The
 student box is the student's own memory plus sharing permissions.
 
-Drop `iso.md` and `student.md` here. Until they exist, the loader falls back
-to `iso.example.md` and `student.example.md` (synthetic data only).
+Real boxes in this folder: `iso.md`, `cmpm.md`, `college.md`, `finaid.md`
+(department policy with sources, fetched 2026-10-10), `student.md` (the synthetic
+demo student) and `student.template.md` (what a new student's box is seeded from).
+The `*.example.md` files are the small fixtures the unit tests use; the loader
+falls back to `<name>.example.md` only when `<name>.md` is missing.
+
+Department metadata that the advocate reads: `department:` (the id), `name:`,
+`topics:` (a regex; the department is asked when the question matches it, every
+department is asked when nothing matches), `authority_order:`.
 
 ## Line grammar (parsed by `box.py`)
 
@@ -24,6 +31,11 @@ to `iso.example.md` and `student.example.md` (synthetic data only).
 `when` conditions: clauses joined by ` and ` / ` or `, each `field op value`.
 Ops: `==`, `!=`, `<`, `<=`, `>`, `>=`, `~` (case-insensitive regex search).
 `question` is always available as a field. A missing field makes the clause false.
+A `~` pattern may use `|` alternations (`question ~ medical|illness|health`); do not
+put spaces around those pipes, and never use ` | ` inside a fact's text.
+
+A blank profile line (`units:`) is a field the student has not filled in: it is
+never shared and any condition over it is false.
 
 ## Student box sections
 

@@ -1,4 +1,10 @@
-# Eval: gremlin vs baseline
+# Eval: gremlins vs baseline
+
+Two runs are recorded here. The first (Saturday evening) used one department box and six
+questions. The second is the ten-case eval in `eval.py` against the four real boxes; run
+`uv run eval.py` and paste the table into the section at the bottom.
+
+## Run 1: one department (ISO example box), six questions
 
 Run on 2026-10-10 (PT) with groq/openai/gpt-oss-120b (fallback nvidia_nim nemotron-3-super), temperature 0, JSON mode.
 Six questions, two per expected outcome. Each case runs on a fresh copy of the example boxes.
@@ -49,3 +55,13 @@ Reproduce: `uv run eval.py --json`. Model output varies slightly between runs ev
 ### a2: If I drop my one in-person class, will my remaining online classes keep me full-time?
 - **gremlin** ASK_STUDENT, uncited 0, fields left 4 (0 protected): You can remain full‑time only if, after dropping the in‑person class, you still have at least 12 units counted toward the full‑time minimum, and you are not relying on more than one online or distance
 - **baseline** ASK_STUDENT, uncited 7, fields left 12 (3 protected): To stay in full‑time F‑1 status you must be enrolled in at least 12 units that count toward the minimum each quarter. Federal rules allow only one online/distance class (up to 3 units) to count toward
+
+
+## Run 2: four departments, ten cases (docs/QUESTIONS.md)
+
+Pending: run `uv run eval.py` on a machine with model keys and paste the table here.
+Expected shape: the gremlin condition should be correct on the verdicts that are decided in
+code (ESCALATED, ASK_STUDENT, UNANSWERED, DISPUTED) regardless of the model, and the
+baseline should keep leaking every protected field because the whole student box is in its
+prompt. Where the gremlin misses, the miss is in the model's `needs` or `options`, which the
+case notes in QUESTIONS.md call out.
