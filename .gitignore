@@ -14,3 +14,8 @@ __pycache__/
 out/
 docs/boxes/student-*.md
 .openchamber/
+
+# Hyperframes check artifacts
+brag-output*/composition/snapshots/
+brag-output*/composition/renders/
+brag-output*/composition/.hyperframes/

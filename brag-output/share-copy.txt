@@ -1,0 +1,2 @@
+Introducing Gremlins: ask every campus office at once and get a verdict with receipts, not a blended paragraph. Your facts stay in your own Drive, and when offices disagree, federal beats campus in code and the override is written down.
+Built on AGNTCY + Campus Cubbies at UCSC, in one weekend. github.com/riptide-06/Gremlins

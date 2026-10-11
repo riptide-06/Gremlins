@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 280" role="img" aria-label="A green gremlin sitting on a wooden cubby box, waving">
+  <g>
+    <rect x="40" y="186" width="180" height="84" rx="10" fill="#E8B86D" stroke="#151515" stroke-width="2"></rect>
+    <rect x="40" y="186" width="180" height="22" rx="10" fill="#F3CF8C" stroke="#151515" stroke-width="2"></rect>
+    <line x1="62" y1="208" x2="62" y2="270" stroke="#151515" stroke-width="2" opacity=".35"></line>
+    <line x1="198" y1="208" x2="198" y2="270" stroke="#151515" stroke-width="2" opacity=".35"></line>
+    <rect x="86" y="222" width="88" height="30" rx="6" fill="#FFFFFF" stroke="#151515" stroke-width="2"></rect>
+    <text x="130" y="242" text-anchor="middle" font-family="Sora, sans-serif" font-size="12" font-weight="800" fill="#151515">MY CUBBY</text>
+    <rect x="98" y="192" width="64" height="8" rx="4" fill="#151515"></rect>
+  </g>
+  <g class="g-all">
+    <g>
+      <rect x="92" y="150" width="20" height="52" rx="10" fill="#6CC26B" stroke="#151515" stroke-width="2"></rect>
+      <rect x="148" y="150" width="20" height="52" rx="10" fill="#6CC26B" stroke="#151515" stroke-width="2"></rect>
+      <ellipse cx="100" cy="204" rx="16" ry="9" fill="#5AA85A" stroke="#151515" stroke-width="2"></ellipse>
+      <ellipse cx="160" cy="204" rx="16" ry="9" fill="#5AA85A" stroke="#151515" stroke-width="2"></ellipse>
+    </g>
+    <g class="g-earl"><path d="M88 92 C70 70, 52 44, 46 26 C68 34, 92 50, 104 74 Z" fill="#6CC26B" stroke="#151515" stroke-width="2" stroke-linejoin="round"></path><path d="M86 84 C76 70, 66 54, 60 42 C72 50, 84 62, 92 76 Z" fill="#F9A7B0"></path></g>
+    <g class="g-earr"><path d="M172 92 C190 70, 208 44, 214 26 C192 34, 168 50, 156 74 Z" fill="#6CC26B" stroke="#151515" stroke-width="2" stroke-linejoin="round"></path><path d="M174 84 C184 70, 194 54, 200 42 C188 50, 176 62, 168 76 Z" fill="#F9A7B0"></path></g>
+    <ellipse cx="130" cy="124" rx="58" ry="54" fill="#6CC26B" stroke="#151515" stroke-width="2"></ellipse>
+    <ellipse cx="130" cy="148" rx="30" ry="20" fill="#B9E5A6"></ellipse>
+    <path d="M118 72 C120 62, 126 60, 128 70 M130 70 C132 58, 138 58, 140 70" fill="none" stroke="#151515" stroke-width="2" stroke-linecap="round"></path>
+    <g class="g-eyes"><circle cx="110" cy="112" r="14" fill="#FFFFFF" stroke="#151515" stroke-width="2"></circle><circle cx="150" cy="112" r="14" fill="#FFFFFF" stroke="#151515" stroke-width="2"></circle><circle cx="113" cy="114" r="6" fill="#151515"></circle><circle cx="153" cy="114" r="6" fill="#151515"></circle><circle cx="115" cy="111" r="2" fill="#FFFFFF"></circle><circle cx="155" cy="111" r="2" fill="#FFFFFF"></circle></g>
+    <circle cx="96" cy="132" r="6" fill="#F9A7B0" opacity=".8"></circle><circle cx="164" cy="132" r="6" fill="#F9A7B0" opacity=".8"></circle>
+    <path d="M108 138 Q130 160 152 138 Z" fill="#151515"></path><rect x="118" y="138" width="7" height="8" rx="2" fill="#FFFFFF"></rect><rect x="135" y="138" width="7" height="8" rx="2" fill="#FFFFFF"></rect>
+    <path d="M78 140 C62 150, 56 166, 64 180" fill="none" stroke="#151515" stroke-width="12" stroke-linecap="round"></path><path d="M78 140 C62 150, 56 166, 64 180" fill="none" stroke="#6CC26B" stroke-width="8" stroke-linecap="round"></path>
+    <g class="g-arm"><path d="M182 134 C196 122, 206 104, 206 86" fill="none" stroke="#151515" stroke-width="12" stroke-linecap="round"></path><path d="M182 134 C196 122, 206 104, 206 86" fill="none" stroke="#6CC26B" stroke-width="8" stroke-linecap="round"></path><circle cx="206" cy="82" r="9" fill="#6CC26B" stroke="#151515" stroke-width="2"></circle></g>
+  </g>
+</svg>
