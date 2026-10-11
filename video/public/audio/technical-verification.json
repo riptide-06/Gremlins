@@ -1,0 +1,101 @@
+[
+  {
+    "file": "01.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 5.529625,
+    "peak": 0.489349365234375,
+    "clippedSamples": 0,
+    "sha256": "9d02076740d5c78be2d17348f4cdf9ac96ec6f6058ddd18968d2fd7ba83bb177"
+  },
+  {
+    "file": "02.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 5.325833333333334,
+    "peak": 0.5380859375,
+    "clippedSamples": 0,
+    "sha256": "f48b20bc0be04a3e5de30c99dc7b4ffe5edbf6de94b30d69805eb3d59e0425a1"
+  },
+  {
+    "file": "03.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 5.406916666666667,
+    "peak": 0.59271240234375,
+    "clippedSamples": 0,
+    "sha256": "6f9aef561c6e3e9924ccf94731ee115934e15347b5157dab99f7c03968e11f67"
+  },
+  {
+    "file": "04.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 7.32675,
+    "peak": 0.64874267578125,
+    "clippedSamples": 0,
+    "sha256": "0b334ed86f8cde0331b08296d01cd8f30ea4dd26ffb990a6920395389ed7d8af"
+  },
+  {
+    "file": "05.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 7.980166666666666,
+    "peak": 0.568389892578125,
+    "clippedSamples": 0,
+    "sha256": "e4bc05d2590e5f48dd834d00a278e1309ee6e03c8d74aed3f97d724864a0106d"
+  },
+  {
+    "file": "06.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 11.294791666666667,
+    "peak": 0.621185302734375,
+    "clippedSamples": 0,
+    "sha256": "7800f8bcc8c9e5b15b8ea3ec7c479eef68b080cf5531e84c5a6253bbbd47e6b9"
+  },
+  {
+    "file": "07.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 7.23925,
+    "peak": 0.6759033203125,
+    "clippedSamples": 0,
+    "sha256": "1614a8c18a59d5b2009d516469dfd151369bdcdfc7291ffad11bfbc4dbfa92eb"
+  },
+  {
+    "file": "08.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 9.330458333333333,
+    "peak": 0.541961669921875,
+    "clippedSamples": 0,
+    "sha256": "c2dcec718e8275a76aae344444afee3defe78dfe7e24efdcf4dc7bcc55e72c9d"
+  },
+  {
+    "file": "09.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 4.415625,
+    "peak": 0.5089111328125,
+    "clippedSamples": 0,
+    "sha256": "3308622d808516593b5b0a7a0172a48e965eceb9381f079680b560c370ca897f"
+  },
+  {
+    "file": "music.wav",
+    "sampleRate": 44100,
+    "channels": 2,
+    "durationSec": 90.0,
+    "peak": 0.799957275390625,
+    "clippedSamples": 0,
+    "sha256": "2ae69581b65b2f8b73b02a497c5a599809266742c76dfb961b5faddb108f2751"
+  },
+  {
+    "file": "audition-reel.wav",
+    "sampleRate": 24000,
+    "channels": 1,
+    "durationSec": 41.250375,
+    "peak": 0.77154541015625,
+    "clippedSamples": 0,
+    "sha256": "09de84984db846a6d795621604c01719802742bc4cf73e1761e9a50fb3e3c4cf"
+  }
+]

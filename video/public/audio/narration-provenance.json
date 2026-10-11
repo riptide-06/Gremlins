@@ -1,0 +1,206 @@
+{
+  "status": "APPROVED candidate B: explicitly selected by user",
+  "reference_audio": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+  "reference_sha256": "b5b61011e581571dc93db5a962b40f8fc61a6c7b6a4b64b0fc8faa75ce273473",
+  "reference_transcript": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+  "model": "/Users/adam/Code/bbb-artifact-tour/audio.cpp/models/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
+  "script_sha256": "3dfc5db8d6691cfe69a5b80e2326a901bb720cd75e73ce133f59a09d8d1228c6",
+  "scenes": [
+    {
+      "id": "01",
+      "method": "approved B reference synthesis",
+      "request": {
+        "id": "01",
+        "seed": 6101,
+        "voice_ref": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+        "reference_text": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+        "text": "We present Campus Cubbies: a production service connecting personal agents with U C S C systems."
+      },
+      "rawSha256": "feed3f6612cc6d9e8768f66cef7c1e67c4e1f1f1643358f2f289cf6eef5d427e",
+      "deliveredSha256": "9d02076740d5c78be2d17348f4cdf9ac96ec6f6058ddd18968d2fd7ba83bb177",
+      "processing": {
+        "id": "01",
+        "rawDurationSec": 6.32,
+        "trimmedDurationSec": 5.53325,
+        "pauseRemovedSec": 0.0,
+        "tempoFactor": 1,
+        "durationSec": 5.529625,
+        "tailSec": 2.120375
+      }
+    },
+    {
+      "id": "02",
+      "method": "exact-text approved take reuse",
+      "sourceId": "01",
+      "source": "/Users/adam/Desktop/gremlins/video/versions/60s/public/audio/01.wav",
+      "sha256": "f48b20bc0be04a3e5de30c99dc7b4ffe5edbf6de94b30d69805eb3d59e0425a1",
+      "text": "Before enrolling next quarter, an international student asks their agent: Is there anything I need to know?",
+      "rawSha256": "1e0da0812b772fc872c16a6b16f61c91bfdb3771e2b1edc001a62e75b0f799b1",
+      "deliveredSha256": "f48b20bc0be04a3e5de30c99dc7b4ffe5edbf6de94b30d69805eb3d59e0425a1",
+      "processing": {
+        "id": "02",
+        "rawDurationSec": 6.24,
+        "trimmedDurationSec": 5.3275,
+        "tempoFactor": 1,
+        "durationSec": 5.325833333333334,
+        "tailSec": 3.3241666666666667,
+        "reusedFrom": "01"
+      }
+    },
+    {
+      "id": "03",
+      "method": "exact-text approved take reuse",
+      "sourceId": "02",
+      "source": "/Users/adam/Desktop/gremlins/video/versions/60s/public/audio/02.wav",
+      "sha256": "6f9aef561c6e3e9924ccf94731ee115934e15347b5157dab99f7c03968e11f67",
+      "text": "Earlier, the International Student Office sent an update about new federal enrollment rules through Campus Cubbies.",
+      "rawSha256": "32a49efc1be96ef1dee18fea2fb6c5691ef744d465329b2f3e798686237dae85",
+      "deliveredSha256": "6f9aef561c6e3e9924ccf94731ee115934e15347b5157dab99f7c03968e11f67",
+      "processing": {
+        "id": "03",
+        "rawDurationSec": 6.8,
+        "trimmedDurationSec": 5.41325,
+        "tempoFactor": 1,
+        "durationSec": 5.406916666666667,
+        "tailSec": 4.243083333333334,
+        "reusedFrom": "02"
+      }
+    },
+    {
+      "id": "04",
+      "method": "exact-text approved take reuse",
+      "sourceId": "03",
+      "source": "/Users/adam/Desktop/gremlins/video/versions/60s/public/audio/03.wav",
+      "sha256": "0b334ed86f8cde0331b08296d01cd8f30ea4dd26ffb990a6920395389ed7d8af",
+      "text": "Now, their agent catches up, connects the update with their enrollment plans, and helps identify what to ask the office before registration.",
+      "rawSha256": "5722177cd387fdbd20a75f51a425a5e4782f1124ceef3fa934676c71bfe1977b",
+      "deliveredSha256": "0b334ed86f8cde0331b08296d01cd8f30ea4dd26ffb990a6920395389ed7d8af",
+      "processing": {
+        "id": "04",
+        "rawDurationSec": 7.92,
+        "trimmedDurationSec": 7.334208333333334,
+        "tempoFactor": 1,
+        "durationSec": 7.32675,
+        "tailSec": 3.3232500000000007,
+        "reusedFrom": "03"
+      }
+    },
+    {
+      "id": "05",
+      "method": "exact-text approved take reuse",
+      "sourceId": "04",
+      "source": "/Users/adam/Desktop/gremlins/video/versions/60s/public/audio/04.wav",
+      "sha256": "e4bc05d2590e5f48dd834d00a278e1309ee6e03c8d74aed3f97d724864a0106d",
+      "text": "No magic here. It's all backed by a new My Cubby folder in your U C S C Google Drive, created for you the first time you connect.",
+      "rawSha256": "f9d127250291cde8f06203c4b542caf1bccc88a742eec45216d0e687dc835f55",
+      "deliveredSha256": "e4bc05d2590e5f48dd834d00a278e1309ee6e03c8d74aed3f97d724864a0106d",
+      "processing": {
+        "id": "05",
+        "rawDurationSec": 8.48,
+        "trimmedDurationSec": 7.982083333333334,
+        "tempoFactor": 1,
+        "durationSec": 7.980166666666666,
+        "tailSec": 5.669833333333334,
+        "reusedFrom": "04"
+      }
+    },
+    {
+      "id": "06",
+      "method": "approved B reference synthesis",
+      "request": {
+        "id": "06",
+        "seed": 6706,
+        "voice_ref": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+        "reference_text": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+        "text": "We built around A two A, the Agent to Agent protocol. Different agent harnesses can discover the service, connect, and use the same permission’d tools. They don't need matching interfaces."
+      },
+      "rawSha256": "d29716032a7ddd21f0a154d7fa79c9331d19bf14bcdcdc6bdedb4f5e682414c8",
+      "deliveredSha256": "7800f8bcc8c9e5b15b8ea3ec7c479eef68b080cf5531e84c5a6253bbbd47e6b9",
+      "processing": {
+        "id": "06",
+        "rawDurationSec": 12.48,
+        "trimmedDurationSec": 11.300833333333333,
+        "pauseRemovedSec": 0.3800000000000008,
+        "tempoFactor": 1,
+        "durationSec": 11.294791666666667,
+        "tailSec": 0.35520833333333357
+      },
+      "canonicalText": "We built around A two A, the Agent to Agent protocol. Different agent harnesses can discover the service, connect, and use the same permissioned tools. They don't need matching interfaces.",
+      "pronunciationNote": "permission’d is a synthesis-only spelling cue for canonical permissioned; independent final ASR must recover permissioned.",
+      "pauseEditTrimmedSourceSec": [
+        3.6,
+        3.98
+      ]
+    },
+    {
+      "id": "07",
+      "method": "approved B reference synthesis",
+      "request": {
+        "id": "07",
+        "seed": 6107,
+        "voice_ref": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+        "reference_text": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+        "text": "The office can contribute without reading your private notes. Cubbies handles permissions and delivery. Your own agent brings the reasoning."
+      },
+      "rawSha256": "c462372efdfd01e8aa660d9a31561326a35c2d1c566c7057dbaa6bf4eddfdc85",
+      "deliveredSha256": "1614a8c18a59d5b2009d516469dfd151369bdcdfc7291ffad11bfbc4dbfa92eb",
+      "processing": {
+        "id": "07",
+        "rawDurationSec": 7.76,
+        "trimmedDurationSec": 7.242791666666666,
+        "pauseRemovedSec": 0.0,
+        "tempoFactor": 1,
+        "durationSec": 7.23925,
+        "tailSec": 2.41075
+      }
+    },
+    {
+      "id": "08",
+      "method": "approved B reference synthesis",
+      "request": {
+        "id": "08",
+        "seed": 6208,
+        "voice_ref": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+        "reference_text": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+        "text": "This is active today: campus Google sign-in, your U C S C Drive, and BayLeaf Chat onboarding. We've verified real sign-in, file operations, and authenticated A two A calls."
+      },
+      "rawSha256": "cd958dd763d650a843d2048d1016292dc7a3b0ede7311a41a295f4d53497dd43",
+      "deliveredSha256": "c2dcec718e8275a76aae344444afee3defe78dfe7e24efdcf4dc7bcc55e72c9d",
+      "processing": {
+        "id": "08",
+        "rawDurationSec": 11.44,
+        "trimmedDurationSec": 10.582333333333333,
+        "pauseRemovedSec": 0.20000000000000107,
+        "tempoFactor": 1.1354434907010014,
+        "durationSec": 9.330458333333333,
+        "tailSec": 0.3195416666666677
+      },
+      "pauseEditTrimmedSourceSec": [
+        5.9,
+        6.1
+      ]
+    },
+    {
+      "id": "09",
+      "method": "approved B reference synthesis",
+      "request": {
+        "id": "09",
+        "seed": 6109,
+        "voice_ref": "/Users/adam/Desktop/gremlins/video/public/audio/auditions/audition-B.wav",
+        "reference_text": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+        "text": "Campus Cubbies. We connect campus knowledge to your agent, ready when you ask."
+      },
+      "rawSha256": "205b12272ed825fa640f40a556f5c692a97892233401806027464144dd3b9891",
+      "deliveredSha256": "3308622d808516593b5b0a7a0172a48e965eceb9381f079680b560c370ca897f",
+      "processing": {
+        "id": "09",
+        "rawDurationSec": 5.6,
+        "trimmedDurationSec": 4.4187916666666665,
+        "pauseRemovedSec": 0.0,
+        "tempoFactor": 1,
+        "durationSec": 4.415625,
+        "tailSec": 1.234375
+      }
+    }
+  ]
+}

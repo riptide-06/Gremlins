@@ -1,0 +1,38 @@
+{
+  "engine": "Stable Audio 3 MLX",
+  "model": "medium",
+  "decoder": "same-l",
+  "seed": 101160,
+  "command": [
+    "/Users/adam/Code/sa3/stable-audio-3/optimized/mlx/sa3",
+    "--prompt",
+    "Instrumental warm minimal electronic and acoustic underscore, gentle steady pulse at 100 BPM, soft felt piano, delicate plucked acoustic strings, muted rounded synth bass, airy subtle pads, restrained tiny percussion. Curious and thoughtful opening, gradually quietly uplifting, gentle harmonic lift midway, intimate human scale, unobtrusive background under documentary narration, sparse arrangement, clean production, soft resolved ending. No vocals.",
+    "--negative-prompt",
+    "vocals, singing, speech, choir, bombastic trailer, epic drums, aggressive percussion, distorted",
+    "--cfg",
+    "2",
+    "--dit",
+    "medium",
+    "--decoder",
+    "same-l",
+    "--seconds",
+    "90",
+    "--seed",
+    "101160",
+    "--steps",
+    "8",
+    "--out",
+    "/Users/adam/Desktop/gremlins/video/public/audio/music.wav"
+  ],
+  "prompt": "Instrumental warm minimal electronic and acoustic underscore, gentle steady pulse at 100 BPM, soft felt piano, delicate plucked acoustic strings, muted rounded synth bass, airy subtle pads, restrained tiny percussion. Curious and thoughtful opening, gradually quietly uplifting, gentle harmonic lift midway, intimate human scale, unobtrusive background under documentary narration, sparse arrangement, clean production, soft resolved ending. No vocals.",
+  "durationSec": 90,
+  "data_provenance": "SA3 licensed AudioSparx and CC Freesound training data per engine documentation.",
+  "preQuantizationHeadroomWrapper": "/Users/adam/Desktop/gremlins/video/sa3_headroom.py",
+  "sha256": "2ae69581b65b2f8b73b02a497c5a599809266742c76dfb961b5faddb108f2751",
+  "headroom": {
+    "preGainPeak": 1.3096204996109009,
+    "linearGainBeforePCM": 0.6108639871151121,
+    "targetPeak": 0.8,
+    "purpose": "Avoid upstream hard clipping before PCM conversion"
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "fps": 30,
+  "durationInFrames": 2700,
+  "scenes": [
+    {
+      "id": "01",
+      "startSec": 0,
+      "durationSec": 8,
+      "text": "We present Campus Cubbies: a production service connecting personal agents with U C S C systems.",
+      "durationInFrames": 240,
+      "audio": "audio/01.wav",
+      "audioStartSec": 0.35,
+      "audioDurationSec": 5.529625
+    },
+    {
+      "id": "02",
+      "startSec": 8,
+      "durationSec": 9,
+      "text": "Before enrolling next quarter, an international student asks their agent: Is there anything I need to know?",
+      "durationInFrames": 270,
+      "audio": "audio/02.wav",
+      "audioStartSec": 8.35,
+      "audioDurationSec": 5.325833333333334
+    },
+    {
+      "id": "03",
+      "startSec": 17,
+      "durationSec": 10,
+      "text": "Earlier, the International Student Office sent an update about new federal enrollment rules through Campus Cubbies.",
+      "durationInFrames": 300,
+      "audio": "audio/03.wav",
+      "audioStartSec": 17.35,
+      "audioDurationSec": 5.406916666666667
+    },
+    {
+      "id": "04",
+      "startSec": 27,
+      "durationSec": 11,
+      "text": "Now, their agent catches up, connects the update with their enrollment plans, and helps identify what to ask the office before registration.",
+      "durationInFrames": 330,
+      "audio": "audio/04.wav",
+      "audioStartSec": 27.35,
+      "audioDurationSec": 7.32675
+    },
+    {
+      "id": "05",
+      "startSec": 38,
+      "durationSec": 14,
+      "text": "No magic here. It's all backed by a new My Cubby folder in your U C S C Google Drive, created for you the first time you connect.",
+      "durationInFrames": 420,
+      "audio": "audio/05.wav",
+      "audioStartSec": 38.35,
+      "audioDurationSec": 7.980166666666666
+    },
+    {
+      "id": "06",
+      "startSec": 52,
+      "durationSec": 12,
+      "text": "We built around A two A, the Agent to Agent protocol. Different agent harnesses can discover the service, connect, and use the same permissioned tools. They don't need matching interfaces.",
+      "durationInFrames": 360,
+      "audio": "audio/06.wav",
+      "audioStartSec": 52.35,
+      "audioDurationSec": 11.294791666666667
+    },
+    {
+      "id": "07",
+      "startSec": 64,
+      "durationSec": 10,
+      "text": "The office can contribute without reading your private notes. Cubbies handles permissions and delivery. Your own agent brings the reasoning.",
+      "durationInFrames": 300,
+      "audio": "audio/07.wav",
+      "audioStartSec": 64.35,
+      "audioDurationSec": 7.23925
+    },
+    {
+      "id": "08",
+      "startSec": 74,
+      "durationSec": 10,
+      "text": "This is active today: campus Google sign-in, your U C S C Drive, and BayLeaf Chat onboarding. We've verified real sign-in, file operations, and authenticated A two A calls.",
+      "durationInFrames": 300,
+      "audio": "audio/08.wav",
+      "audioStartSec": 74.35,
+      "audioDurationSec": 9.330458333333333
+    },
+    {
+      "id": "09",
+      "startSec": 84,
+      "durationSec": 6,
+      "text": "Campus Cubbies. We connect campus knowledge to your agent, ready when you ask.",
+      "durationInFrames": 180,
+      "audio": "audio/09.wav",
+      "audioStartSec": 84.35,
+      "audioDurationSec": 4.415625
+    }
+  ]
+}

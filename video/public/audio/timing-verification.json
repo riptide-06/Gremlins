@@ -1,0 +1,83 @@
+[
+  {
+    "id": "01",
+    "rawDurationSec": 6.32,
+    "trimmedDurationSec": 5.53325,
+    "pauseRemovedSec": 0.0,
+    "tempoFactor": 1,
+    "durationSec": 5.529625,
+    "tailSec": 2.120375
+  },
+  {
+    "id": "02",
+    "rawDurationSec": 6.24,
+    "trimmedDurationSec": 5.3275,
+    "tempoFactor": 1,
+    "durationSec": 5.325833333333334,
+    "tailSec": 3.3241666666666667,
+    "reusedFrom": "01"
+  },
+  {
+    "id": "03",
+    "rawDurationSec": 6.8,
+    "trimmedDurationSec": 5.41325,
+    "tempoFactor": 1,
+    "durationSec": 5.406916666666667,
+    "tailSec": 4.243083333333334,
+    "reusedFrom": "02"
+  },
+  {
+    "id": "04",
+    "rawDurationSec": 7.92,
+    "trimmedDurationSec": 7.334208333333334,
+    "tempoFactor": 1,
+    "durationSec": 7.32675,
+    "tailSec": 3.3232500000000007,
+    "reusedFrom": "03"
+  },
+  {
+    "id": "05",
+    "rawDurationSec": 8.48,
+    "trimmedDurationSec": 7.982083333333334,
+    "tempoFactor": 1,
+    "durationSec": 7.980166666666666,
+    "tailSec": 5.669833333333334,
+    "reusedFrom": "04"
+  },
+  {
+    "id": "06",
+    "rawDurationSec": 12.48,
+    "trimmedDurationSec": 11.300833333333333,
+    "pauseRemovedSec": 0.3800000000000008,
+    "tempoFactor": 1,
+    "durationSec": 11.294791666666667,
+    "tailSec": 0.35520833333333357
+  },
+  {
+    "id": "07",
+    "rawDurationSec": 7.76,
+    "trimmedDurationSec": 7.242791666666666,
+    "pauseRemovedSec": 0.0,
+    "tempoFactor": 1,
+    "durationSec": 7.23925,
+    "tailSec": 2.41075
+  },
+  {
+    "id": "08",
+    "rawDurationSec": 11.44,
+    "trimmedDurationSec": 10.582333333333333,
+    "pauseRemovedSec": 0.20000000000000107,
+    "tempoFactor": 1.1354434907010014,
+    "durationSec": 9.330458333333333,
+    "tailSec": 0.3195416666666677
+  },
+  {
+    "id": "09",
+    "rawDurationSec": 5.6,
+    "trimmedDurationSec": 4.4187916666666665,
+    "pauseRemovedSec": 0.0,
+    "tempoFactor": 1,
+    "durationSec": 4.415625,
+    "tailSec": 1.234375
+  }
+]

@@ -1,0 +1,38 @@
+{
+  "status": "APPROVED: user explicitly selected candidate B",
+  "reason": "User cast choice after four auditions: Quiet assurance.",
+  "engine": "audiocpp qwen3_tts Metal",
+  "model": "/Users/adam/Code/bbb-artifact-tour/audio.cpp/models/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF",
+  "reference_transcript": "Campus Cubbies brings campus knowledge to your own agent. Ordinary files become useful context, ready when you ask.",
+  "candidates": [
+    {
+      "id": "A",
+      "name": "Warm peer",
+      "seed": 1101,
+      "instruct": "A young adult woman with a warm, clear mid-register American English voice. Friendly, grounded and intelligent, like a helpful graduate student. Conversational documentary narration, natural brisk pace, crisp diction, gently curious. No sales pitch or exaggerated enthusiasm.",
+      "audio": "auditions/audition-A.wav"
+    },
+    {
+      "id": "B",
+      "name": "Quiet assurance",
+      "seed": 2202,
+      "instruct": "An adult man with a soft resonant baritone American English voice, warm and lightly textured. Calm assurance and understated curiosity, explaining a useful idea to a colleague. Natural brisk conversational pace, clear diction, no theatrical delivery or advertising cadence.",
+      "audio": "auditions/audition-B.wav"
+    },
+    {
+      "id": "C",
+      "name": "Bright guide",
+      "seed": 3303,
+      "instruct": "An adult woman with a clear warm alto voice and a light British English accent. Thoughtful, inviting, quietly confident documentary guide. Nimble conversational pace and precise consonants, restrained expressive lift, never posh or promotional.",
+      "audio": "auditions/audition-C.wav"
+    },
+    {
+      "id": "D",
+      "name": "Thoughtful builder",
+      "seed": 4404,
+      "instruct": "An adult man with a warm mid-range voice and a light Indian English accent. Curious, approachable and assured, like a thoughtful campus researcher sharing something practical. Brisk natural speech, clear articulation, gentle optimism, no announcer cadence.",
+      "audio": "auditions/audition-D.wav"
+    }
+  ],
+  "selected": "B"
+}
