@@ -110,7 +110,7 @@ h3{font-size:14px;margin:14px 0 6px}
       });
     }
     if (v.ask && v.ask.length){
-      html += '<div class="row"><b>A department needs more from you</b> <span class="muted">(nothing was shared yet)</span></div>';
+      html += '<div class="row"><b>A department needs more from you</b> <span class="muted">(that field was not shared; approve it or ignore it)</span></div>';
       depts.forEach(function(d){
         (v.ask_by_dept && v.ask_by_dept[d] || []).forEach(function(f){
           html += '<button class="small yes" data-approve="'+esc(f)+'" data-dept="'+esc(d)+'" data-q="'+esc(question)+'">share '+esc(f)+' with '+esc(d.toUpperCase())+' and re-ask</button>';
@@ -119,7 +119,7 @@ h3{font-size:14px;margin:14px 0 6px}
     }
     if (v.brief && Object.keys(v.brief).length){
       html += '<dl class="brief">';
-      Object.keys(v.brief).forEach(function(k){ var val=v.brief[k]; html += '<dt>'+esc(k)+'</dt><dd>'+esc(Array.isArray(val)?val.join('; '):val)+'</dd>'; });
+      Object.keys(v.brief).forEach(function(k){ var val=v.brief[k]; if(!val || (Array.isArray(val) && !val.length)) return; html += '<dt>'+esc(k)+'</dt><dd>'+esc(Array.isArray(val)?val.join('; '):val)+'</dd>'; });
       html += '</dl>';
     }
     if (v.escalations && v.escalations.length) html += '<div class="row muted">triggers fired in code: '+cites(v.escalations)+'</div>';
