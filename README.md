@@ -6,6 +6,31 @@ use them. The agent client supplies conversational reasoning.
 
 Hackathon teammates: Adam Smith and Tarun Nagaraju. Cloud AI track, October 2026.
 
+## Boxes, department gremlins, and the advocate (October 10, 2026)
+
+The memory prototype below is unchanged. On top of it, the repo now has a
+compliant-consensus layer where code decides and the model only drafts:
+
+| File | What it is |
+|---|---|
+| `box.py` | Parser and `BoxStore` for the Markdown boxes in `docs/boxes/` (facts `F-xx`, precedence `P-xx`, FAQ `Q-xx`, escalation triggers `E-xx`, the sharing permissions table). `MarkdownBoxStore` now, `GoogleDocBoxStore` stub for later. |
+| `brain.py` | `Brain.complete(system, user, schema) -> dict | None`. LiteLLM (groq gpt-oss-120b, nvidia_nim fallback), temperature 0, JSON mode, one retry. `BayleafBrain` stub. Prompts come from the current box only. |
+| `dept_gremlin.py` | Stateless A2A server, skill `answer`: `{session_id, question, context}` -> `{scope, answer, cites, needs, options, escalate, authority, confidence}`. Cites are checked against the box; `escalate` comes from `E-xx` triggers in code. `uv run dept_gremlin.py serve --dept iso --port 10001` |
+| `wall.py` | Permissions outbound (yes / no -> "not shared" / ask -> approval / never), identity redaction, cite verification inbound, rejection of answers that echo protected fields. |
+| `advocate.py` | The student gremlin: wall, every in-scope department, one resend round, preference scoring, verdict (CONVERGED, ESCALATED, DISPUTED, ASK_STUDENT) written to student sections 4 to 8. |
+| `mcp_server.py` | The advocate over MCP: `ask`, `my_box`, `approve_share`, `open_items`. stdio via `uv run mcp_server.py`; `/mcp` on the cloud app behind the UCSC login. |
+| `baseline.py`, `eval.py` | One-call baseline and the six-question eval. Results in [docs/EVAL.md](docs/EVAL.md). |
+| `demo.py` | Three questions end to end, A2A over SLIM when a node is up, in-process otherwise. |
+
+```sh
+uv sync && uv run pytest -q          # unit tests, no network
+uv run demo.py                       # live models, fresh copy of the boxes under out/demo/
+uv run eval.py                       # one table: gremlin vs baseline
+```
+
+Drop `iso.md` and `student.md` into `docs/boxes/`; until then the `*.example.md`
+files are used. Format: [docs/boxes/README.md](docs/boxes/README.md).
+
 ## Working local prototype
 
 Requires [uv](https://docs.astral.sh/uv/).

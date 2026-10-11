@@ -1,7 +1,11 @@
 # Claude.ai integration findings
 
-Research date: October 10, 2026. **The MCP adapter is not implemented yet.**
-The current cloud app exposes A2A. Claude.ai does not automatically speak A2A
+Research date: October 10, 2026. **Status, later that day:** `mcp_server.py`
+implements the advocate over MCP (stdio, and `/mcp` streamable HTTP in
+`cloud_app.py` behind the UCSC login or a student bearer). It exposes the
+advocate's tools (`ask`, `my_box`, `approve_share`, `open_items`), not the raw
+memory tools below; the OAuth-for-connectors flow described here is still open.
+The cloud app also exposes A2A. Claude.ai does not automatically speak A2A
 to an arbitrary service, and its code sandbox may block a Cloud Run hostname.
 
 ## Supported route

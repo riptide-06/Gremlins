@@ -9,6 +9,10 @@ AGNTCY's slima2a pins a2a-sdk 1.1.0; the deployed app uses 1.2.2.
 The gateway holds no Gremlin credentials or memory. It forwards the caller's
 bearer from SLIM RPC metadata to one fixed upstream, which enforces all roles.
 Loopback plaintext SLIM node: synthetic testing only, not a hosted secure relay.
+
+`answer` mode (added for the department gremlins): send one raw JSON request
+{"session_id", "question", "context"} to a gateway whose upstream is a
+dept_gremlin.py server, and print the artifact JSON on the last stdout line.
 """
 import argparse
 import asyncio
@@ -172,29 +176,54 @@ async def run_client(args):
         slim_url=args.node, secret=shared_secret(), log_level="warn")
     channel = slim.Channel.new_with_connection(app, slim.Name(*split_name(args.name)), connection)
     stub = A2AServiceStub(channel)
-    request = SendMessageRequest(message=new_text_message(
-        json.dumps({"action": args.action, "text": args.text}), role=Role.ROLE_USER))
+    if args.mode == "answer":
+        text = args.action  # the raw JSON request for the dept gremlin's answer skill
+    else:
+        text = json.dumps({"action": args.action, "text": args.text})
+    request = SendMessageRequest(message=new_text_message(text, role=Role.ROLE_USER))
     try:
-        response = await stub.SendMessage(request, timeout=timedelta(seconds=25),
+        response = await stub.SendMessage(request, timeout=timedelta(seconds=90),
                                           metadata={"authorization": "Bearer " + token})
-        print(MessageToJson(response, indent=2))
+        if args.mode == "answer":
+            print(json.dumps(artifact_json(response), ensure_ascii=False))
+        else:
+            print(MessageToJson(response, indent=2))
     finally:
         await service.shutdown_async()
 
 
+def artifact_json(response):
+    """First JSON text part of a task artifact (dept gremlins) or of a message."""
+    parts = []
+    if response.HasField("task"):
+        for artifact in response.task.artifacts:
+            parts.extend(artifact.parts)
+    elif response.HasField("message"):
+        parts.extend(response.message.parts)
+    for part in parts:
+        if part.WhichOneof("content") == "text":
+            try:
+                return json.loads(part.text)
+            except ValueError:
+                continue
+    return {"ok": False, "error": "no JSON artifact in response"}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=["node", "gateway", "call"])
-    parser.add_argument("action", nargs="?", choices=["hello", "read", "remember", "contribute"])
+    parser.add_argument("mode", choices=["node", "gateway", "call", "answer"])
+    parser.add_argument("action", nargs="?", help="call: hello|read|remember|contribute; answer: the JSON request")
     parser.add_argument("text", nargs="?", default="")
     parser.add_argument("--node", default=DEFAULT_NODE)
     parser.add_argument("--name", default=DEFAULT_NAME)
     parser.add_argument("--upstream", default=DEFAULT_UPSTREAM)
     args = parser.parse_args()
-    if args.mode == "call" and args.action is None:
-        parser.error("call requires an action")
+    if args.mode == "call" and args.action not in ("hello", "read", "remember", "contribute"):
+        parser.error("call requires an action: hello, read, remember, or contribute")
+    if args.mode == "answer" and not args.action:
+        parser.error("answer requires a JSON request")
     try:
         asyncio.run({"node": run_node, "gateway": lambda: run_gateway(args),
-                     "call": lambda: run_client(args)}[args.mode]())
+                     "call": lambda: run_client(args), "answer": lambda: run_client(args)}[args.mode]())
     except KeyboardInterrupt:
         pass
