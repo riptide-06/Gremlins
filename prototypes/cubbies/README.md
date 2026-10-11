@@ -2,8 +2,12 @@
 
 Permissioned campus correspondence in a person's UCSC Google Drive **My Cubby**
 folder. The service is mechanical; the caller's agent supplies reasoning.
-Production: https://cubby.bayleaf.dev. This is a prototype, not an institutionally
-approved service for sensitive records.
+Production: https://cubby.bayleaf.dev. This is a fully integrated production
+service within the UCSC–Google–BayLeaf infrastructure boundary. Google-hosted
+system data is covered by the campus Data Protection Agreement (DPA); BayLeaf
+has previously been reviewed by the campus CISO. Cubbies itself runs no AI
+inference. The user's own agent's inference provider is the potential boundary
+crossing and requires separate approval for the information it processes.
 
 ## Sources of truth
 

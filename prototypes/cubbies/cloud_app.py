@@ -395,7 +395,11 @@ def create_app(settings=None, repo=None, drive=None):
                      + escape(settings.url) + '</blockquote><p>Ask it to help you set up your campus cubby. It will guide you through connecting your UCSC account.</p>'
                      '<p><a href="/SKILL.md">Agents: start here to connect</a>.</p>'
                     '<p><strong>Don’t have an agent?</strong> <a href="https://chat.bayleaf.dev/?model=basic&amp;tools=lathe&amp;q=Help%20me%20set%20up%20my%20Campus%20Cubby.%20Start%20with%20the%20public%20agent%20guide%20at%20https%3A%2F%2Fcubby.bayleaf.dev%2FSKILL.md%20We%20trust%20BayLeaf%20inference.&amp;submit=false">Try Cubbies via Bayleaf Chat</a>.</p>'
-                     '<p>This is a prototype. Please don’t use it for sensitive records.</p>', discovery=True)
+                     '<p>Campus Cubbies is a fully integrated production service within the UCSC–Google–BayLeaf infrastructure boundary. '
+                     'Google-hosted system data is covered by the campus Data Protection Agreement (DPA); '
+                     'BayLeaf has previously been reviewed by the campus CISO. Cubbies itself runs no AI inference. '
+                     'Your own agent’s inference provider is where information may leave that boundary and needs separate approval '
+                     'for the information it processes.</p>', discovery=True)
 
     async def device(request):
         try:

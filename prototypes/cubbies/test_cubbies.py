@@ -651,6 +651,13 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
         assert "<details>" not in landing and "Instructions for agents" not in landing
         assert "A2A" not in landing and "Python" not in landing
         assert "can’t peek at what’s inside" in landing
+        assert "fully integrated production service" in landing
+        assert "campus Data Protection Agreement (DPA)" in landing
+        assert "UCSC–Google–BayLeaf infrastructure boundary" in landing
+        assert "BayLeaf has previously been reviewed by the campus CISO" in landing
+        assert "Cubbies itself runs no AI inference" in landing
+        assert "inference provider is where information may leave that boundary and needs separate approval" in landing
+        assert "prototype" not in landing.lower()
         assert "gremlin" not in landing.lower()
         assert "gremlin" not in (await http.get("/.well-known/agent-card.json")).text.lower()
         for retired in ("/cubby_client.py", "/gremlin_client.py"):

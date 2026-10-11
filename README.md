@@ -5,11 +5,18 @@ Drive tools for people's agents. The server is mechanical: the caller supplies
 reasoning. A2A is the showcased interface for this Cisco-sponsored hackathon.
 Hackathon teammates: Adam Smith and Tarun Nagaraju, October 2026.
 
-## Prototype index
+Campus Cubbies is a fully integrated production service within the
+UCSC–Google–BayLeaf infrastructure boundary. Google-hosted system data is covered
+by the campus Data Protection Agreement (DPA); BayLeaf has previously been
+reviewed by the campus CISO. The user's own agent's inference provider is the
+potential boundary crossing and requires separate approval for the information
+it processes. Cubbies itself runs no AI inference.
 
-| Folder | Prototype | Status |
+## Service and development history
+
+| Folder | Service or development stage | Status |
 | --- | --- | --- |
-| [cubbies](prototypes/cubbies/) | Campus Cubbies, with Google Drive integration | Active pilot at https://cubby.bayleaf.dev |
+| [cubbies](prototypes/cubbies/) | Campus Cubbies, with Google Drive integration | Production at https://cubby.bayleaf.dev |
 | [a2a-echo](prototypes/a2a-echo/) | Original no-memory A2A echo | Historical |
 | [markdown-memory](prototypes/markdown-memory/) | Permissioned local Markdown memory | Historical |
 | [firestore](prototypes/firestore/) | Google login and Firestore-backed memory | Historical |
