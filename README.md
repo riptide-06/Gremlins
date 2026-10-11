@@ -142,91 +142,45 @@ numbers in `docs/EVAL.md` are from the final run, not a held-out set.
 - Free-tier models rate-limit under four parallel calls; the model order and the replay
   cache are the mitigation, not a solution.
 
----
 
-The sections below describe the earlier memory prototype this repo started from.
+Gremlins are the agents; Campus Cubbies is the boundary they argue inside. The gremlin
+layer (everything above this line) lives at the repository root and runs as its own
+service (`gremlin_app.py`, `Dockerfile.gremlins`). Campus Cubbies is below, as Adam
+wrote it, with the earlier prototypes it grew from under `prototypes/`.
 
-## Working local prototype
+## Campus Cubbies: the boundary (Adam Smith)
 
-Requires [uv](https://docs.astral.sh/uv/).
+An **A2A 1.0** service for permissioned campus correspondence and personal Google
+Drive tools for people's agents. The server is mechanical: the caller supplies
+reasoning. A2A is the showcased interface for this Cisco-sponsored hackathon.
+Hackathon teammates: Adam Smith and Tarun Nagaraju, October 2026.
 
-```sh
-uv run gremlin_memory.py serve
-```
+### Prototype index
 
-The service listens on port 10000. By default its agent card advertises
-`http://127.0.0.1:10000`. For another machine to connect, set `GREMLIN_URL` to the
-reachable URL **before starting the server**, and use that URL in client calls.
+| Folder | Prototype | Status |
+| --- | --- | --- |
+| [cubbies](prototypes/cubbies/) | Campus Cubbies, with Google Drive integration | Active pilot at https://cubby.bayleaf.dev |
+| [a2a-echo](prototypes/a2a-echo/) | Original no-memory A2A echo | Historical |
+| [markdown-memory](prototypes/markdown-memory/) | Permissioned local Markdown memory | Historical |
+| [firestore](prototypes/firestore/) | Google login and Firestore-backed memory | Historical |
+| [slim](prototypes/slim/) | Isolated A2A-over-SLIM gateway and client | Historical |
 
-At first startup the server creates two untracked, host-only files:
+Historical source and documentation are retained as development records;
+their original commands, deployment claims, and sibling-file assumptions may
+no longer apply. Only Campus Cubbies is the active runnable target.
 
-- `.gremlin-keys.json`: separate student and advisor bearer credentials.
-- `student-notebook.md`: persistent memory simulating a shared Google Doc.
+### Campus Cubbies development
 
-Give the student only the student credential. Never publish these files.
-
-```sh
-export GREMLIN_TOKEN='your-role-token'
-uv run gremlin_memory.py hello
-uv run gremlin_memory.py remember 'A synthetic private fact'
-uv run gremlin_memory.py read
-```
-
-An advisor uses their own token and only:
-
-```sh
-uv run gremlin_memory.py contribute 'Attributed outside guidance'
-```
-
-For a remote service, append `--url https://your-service` to client commands.
-
-## Self-instructing A2A
-
-Discover `/.well-known/agent-card.json`, then send `hello` using authenticated
-A2A 1.0 JSON-RPC. The greeting explains the caller's role and exact JSON tool
-requests. A downloadable client is available at `/gremlin_memory.py`.
-
-The runtime enforces permissions before reading memory. Advisors may contribute
-but cannot read memory. Separate task stores prevent advisor task lookups from
-retrieving student responses. External contributions are untrusted data, not
-instructions. Stdout emits structured events with contents redacted.
-
-## Boundaries
-
-This local version is a **synthetic demonstration**, not production security:
-plaintext HTTP, shared role credentials, host-readable files, and in-memory A2A
-tasks. The host can inspect the notebook. Agent clients may retain conversations
-and tool results. No model, Google Docs integration, student service accounts,
-or consented outbound outreach is implemented. Optional SLIM transport is
-provided by a separate gateway, described below.
-
-`gremlin_a2a.py` preserves the earlier minimal A2A echo proof.
-
-## Cloud Run direction
-
-Live onboarding: **https://gremlin-331254975906.us-west1.run.app**.
-Google login is **Internal, UCSC-only**. Use synthetic data for this pilot.
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the deployment and verification record.
-
-Target project: `gremlins-511221`. `cloud_app.py` implements verified UCSC Google
-login, a small onboarding page issuing copy-pasteable scoped agent credentials,
-Firestore-backed per-student memory, HTTPS A2A, and redacted Cloud Logging.
-Local test data and credentials are not migrated.
+Use the shared root `pyproject.toml` and `uv.lock`:
 
 ```sh
 uv sync
 uv run pytest -q
-uv run uvicorn cloud_app:app --port 8080 --no-access-log
+LOCAL_HTTP=1 uv run uvicorn cloud_app:app --app-dir prototypes/cubbies --port 8080 --no-access-log
 ```
 
-Without OAuth configuration, the local page explains that login is not yet
-configured. See [CLOUD_RUN.md](CLOUD_RUN.md) for configuration, deployment,
-privacy boundaries, costs, and cleanup. Tests use a fake repository, not real
-Firestore or Google login. Real cloud/OAuth integration requires deployment.
-
-## Optional SLIM transport
-
-`gremlin_slim.py` connects agents over AGNTCY SLIM SlimRPC and forwards A2A to
-the same permissioned backend. It runs separately, with no change to Cloud Run
-or the core dependencies. Student/advisor permissions remain backend-enforced.
-See [SLIM.md](SLIM.md) for a three-terminal laptop demo and security boundaries.
+The root Dockerfile and upload allowlists package `prototypes/cubbies/`.
+See [current configuration, security boundaries, and deployment setup](prototypes/cubbies/README.md).
+Agent connection instructions are canonical in [SKILL.md](prototypes/cubbies/SKILL.md);
+current live evidence is in [DEPLOYMENT.md](prototypes/cubbies/DEPLOYMENT.md).
+Earlier deployment records in `prototypes/firestore/` are historical, not current setup instructions.

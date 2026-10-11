@@ -13,3 +13,4 @@ __pycache__/
 *.pyc
 out/
 docs/boxes/student-*.md
+.openchamber/

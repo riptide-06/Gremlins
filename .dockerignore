@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!prototypes/
+prototypes/*
+!prototypes/cubbies/
+prototypes/cubbies/*
+!prototypes/cubbies/cloud_app.py
+!prototypes/cubbies/cubbies.py
+!prototypes/cubbies/cubby_drive.py
+!prototypes/cubbies/SKILL.md

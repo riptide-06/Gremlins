@@ -12,5 +12,11 @@ jobs:
           version: "0.7.4"
           python-version: "3.12"
       - run: uv sync --frozen
-      - run: uv run pytest -q
-      - run: uv run --script slim_tests.py
+      - run: uv run python -m compileall -q prototypes/cubbies
+      - name: Campus Cubbies tests
+        run: uv run pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Browser guide and domain proxy tests
+        run: node --test prototypes/cubbies/browser-guide.test.mjs prototypes/cubbies/domain-proxy.test.mjs
