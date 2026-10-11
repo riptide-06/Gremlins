@@ -91,3 +91,12 @@ async def test_a2a_round_trip_and_hello_guide(store):
         assert hello["guide"]["skill"] == "answer"
     logged = [l for l in store.load("iso").section(5).lines if l.strip()]
     assert any("s-a2a" in l for l in logged)
+
+
+def test_option_basis_must_be_a_cited_fact(store):
+    opts = [{"option": "a", "conditions": [], "cites": ["F-01", "F-07"], "basis": "F-07", "units": 12},
+            {"option": "b", "conditions": [], "cites": ["F-01"], "basis": "F-07", "units": 12},      # not among its cites
+            {"option": "c", "conditions": [], "cites": ["F-01", "Q-01"], "basis": "Q-01", "units": 12},  # not a fact
+            {"option": "d", "conditions": [], "cites": ["F-01"], "units": 12}]                        # none given
+    out = validate_answer(good_answer(options=opts), store.load("iso"), [])
+    assert [o["basis"] for o in out["options"]] == ["F-07", "", "", ""]

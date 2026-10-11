@@ -22,7 +22,7 @@ Before recording:
 | 0:18 | c1 | type "Can I drop my 5-unit GE and go from 17 to 12 units?", verdict card CONVERGED | "The advocate picks the offices from what each box says it covers, shares the minimum, asks all four at once. Every claim cites a rule. Twelve units: everyone agrees. Converged." |
 | 0:30 | p1 | type the "my college adviser approved 10 units" question, CONVERGED with override | "Here the college says yes and ISO says no. Nobody voted. Federal immigration rules outrank campus rules, so the answer is no, and the override is written down, with who overrode whom." |
 | 0:42 | a1 then approve | "second on-campus job" question, ASK_STUDENT, click share hours with ISO, re-ask, CONVERGED | "ISO needs my hours. It didn't get them. I approve, once, for ISO only. Now it can answer: ten more hours keeps me under the cap." |
-| 0:54 | d1 | CMPM 120 question after approval, DISPUTED | "Two advisers, same authority, opposite advice. The system keeps the disagreement instead of flipping a coin: both positions, what would settle it, and that I decide." |
+| 0:54 | d1 | CMPM 120 question, ASK (hours for the college), press "Yes, share all and ask again", DISPUTED | "Two advisers, same authority, opposite advice: CMPM says add it now, it runs once a year; the college says not at 22 units with a job. The system keeps the disagreement instead of flipping a coin: both positions, what would settle it, and that I decide." (If the live run lands CONVERGED with a precedence line instead, say that: "this time a rule outranked the advice, and it says which.") |
 | 1:04 | e2 | My Cubby: click days_to_deadline, set 2, back to chat, re-ask c1, ESCALATED | "Same question, new information: the deadline is in two days. A trigger in code, not the model, escalates it to a human with a brief." |
 | 1:14 | bring your own agent | Claude Desktop: ask the gremlin tool the same c1 question; result shows what left the box | "You don't need our chat. Add one MCP URL to your own Claude and it's the same gremlin, the same wall." |
 | 1:22 | SLIM | terminal: demo.py with the SLIM gateway lines, ISO call travelling agent to SLIM to A2A | "Departments are A2A agents. Here ISO is reached over Cisco's SLIM transport; the others run in process. Same contract either way." |
@@ -37,7 +37,7 @@ AI4GOOD workshop; stale-memory paper under review at NORA 2026").
 
 Run from the repo root after pushing: `/brag --tone polished --format landscape --title "Gremlins"`
 with the direction: "Campus offices give three different answers; the student's gremlin asks
-all of them, shares only what the student allowed, and tells you who decides. Show chat.html
+all of them, shares only what the student allowed, and tells you who decides. Show the site
 and the verdict badges CONVERGED / DISPUTED / ESCALATED." Hook line if it comes out generic:
 "Three offices gave three answers. The gremlins didn't pick one. They told me who decides."
 Use the teaser for the devpost header and LinkedIn; the 90-second recording is the demo.

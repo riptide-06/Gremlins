@@ -94,7 +94,7 @@ advocate turns into an ASK_STUDENT item.
 # 5. Converged answers       (one line, the answer plus cites)
 2026-10-11T06:12:01Z | CONVERGED | s-0042 | 12 units keeps F-1 status and needs no college approval | iso:F-01 college:F-04
 # 6. Briefs                  (disputed or escalated: positions, what would resolve it, who decides)
-2026-10-11T06:20:00Z | DISPUTED | s-0043 | cmpm: add CMPM 120 now (F-15) vs college: at most two heavy technical courses while working 10h (F-13) | resolves: student priority, on-time graduation vs workload | decides: student with college adviser
+2026-10-11T06:20:00Z | DISPUTED | s-0043 | cmpm: add CMPM 120 now (F-15) vs college: stay at or below 19 credits while working 10h (F-13) | resolves: student priority, on-time graduation vs workload | decides: student with college adviser
 # 8. Open items              (ASK_STUDENT)
 2026-10-11T06:19:30Z | ASK | s-0043 | college | hours | needed to apply the load practice
 ```

@@ -219,9 +219,8 @@ def default_brain() -> Brain:
     """LiteLLMBrain (wrapped in the replay cache unless GREMLIN_CACHE=0) when a provider
     key is present, else a ScriptedBrain that returns None."""
     load_env_file()
-    if os.environ.get("GROQ_API_KEY") or os.environ.get("NVIDIA_NIM_API_KEY") or os.environ.get("GEMINI_API_KEY"):
-        brain: Brain = LiteLLMBrain(models=model_list())
-        if os.environ.get("GREMLIN_CACHE", "1") not in ("0", "false", "no"):
-            brain = CachedBrain(brain)
-        return brain
-    return ScriptedBrain()
+    keyed = bool(os.environ.get("GROQ_API_KEY") or os.environ.get("NVIDIA_NIM_API_KEY") or os.environ.get("GEMINI_API_KEY"))
+    brain: Brain = LiteLLMBrain(models=model_list()) if keyed else ScriptedBrain()
+    if os.environ.get("GREMLIN_CACHE", "1") not in ("0", "false", "no"):
+        brain = CachedBrain(brain)   # without keys this is replay-only: cached prompts answer, new ones come back None
+    return brain

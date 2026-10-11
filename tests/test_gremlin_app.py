@@ -88,7 +88,7 @@ async def test_pairing_flow_puts_the_box_in_the_cubby(campus):
         # the server respects the interval: an immediate second poll is answered locally as pending
         assert (await http.post("/api/connect/poll", json={}, headers=API)).json()["status"] == "authorization_pending"
         import asyncio
-        await asyncio.sleep(1.1)                                                        # one interval later
+        await asyncio.sleep(1.5)                                                        # past the one-second interval, with slack
         done = (await http.post("/api/connect/poll", json={}, headers=API)).json()
         assert done["status"] == "connected" and done["identity"] == "demo@ucsc.edu" and done["created"] is True
         me = (await http.get("/api/me")).json()

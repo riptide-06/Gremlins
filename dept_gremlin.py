@@ -58,7 +58,7 @@ BRAIN_SCHEMA = {
                    "options": {"type": "array", "items": OPTION_SCHEMA},
                    "confidence": {"type": "number"}},
 }
-ANSWER_KEYS = ("scope", "answer", "cites", "needs", "options", "escalate", "authority", "confidence")
+ANSWER_KEYS = ("scope", "answer", "cites", "needs", "options", "escalate", "authority", "confidence", "failed")
 
 SYSTEM = """You are the {dept_name} gremlin, a department answering machine.
 You know ONLY the box below. Every claim you make must cite a box id (F-xx fact,
@@ -85,7 +85,11 @@ Reply with one JSON object:
   "cites": ["F-01", ...],            // every id you relied on
   "needs": ["field", ...],           // context fields you still need, or []
   "options": [{{"option": "what the student could do", "conditions": ["what must hold"],
-               "cites": ["F-xx"], "units": number|null, "hours": number|null, "weeks": number|null}}],
+               "cites": ["F-xx"], "basis": "F-xx", "units": number|null, "hours": number|null, "weeks": number|null}}],
+  // options: the one you recommend FIRST. basis = the single rule the option rests on (one of its
+  // cites; the server reads that rule's authority level from the box, a permission quoted in
+  // passing does not count). units = the student's TOTAL enrolled units after the option (never
+  // one course's units); hours = total work hours per week after it; weeks = how long it takes
   "confidence": 0.0 to 1.0}}
 
 === BOX: {box_title} ===
@@ -98,9 +102,9 @@ context (fields the student's advocate chose to share; "not shared" means withhe
 {context}"""
 
 
-def empty_answer(scope: str = "out_of_scope") -> dict:
+def empty_answer(scope: str = "out_of_scope", failed: bool = False) -> dict:
     return {"scope": scope, "answer": "", "cites": [], "needs": [], "options": [],
-            "escalate": False, "authority": "", "confidence": 0.0}
+            "escalate": False, "authority": "", "confidence": 0.0, "failed": failed}
 
 
 def build_prompts(box: Box, dept_name: str, question: str, context: dict) -> tuple[str, str]:
@@ -126,7 +130,7 @@ def _num(value):
 
 def validate_answer(raw: dict | None, box: Box, triggers: list[str]) -> dict:
     """Code owns the contract: filter cites to the box, clamp, add escalate/authority."""
-    out = empty_answer()
+    out = empty_answer(failed=raw is None)   # failed: the model gave nothing usable; not the same as out of scope
     if raw is not None:
         out["scope"] = raw["scope"] if raw.get("scope") in SCOPES else "out_of_scope"
         out["answer"] = str(raw.get("answer", ""))[:4000]
@@ -139,9 +143,12 @@ def validate_answer(raw: dict | None, box: Box, triggers: list[str]) -> dict:
             if not isinstance(opt, dict):
                 continue
             cites = [c for c in _dedupe(opt.get("cites", [])) if box.has(c)]
+            basis = str(opt.get("basis", "") or "").strip()
+            if basis not in cites or basis not in box.facts:
+                basis = ""   # a basis must be a fact the option itself cites; otherwise the cites decide
             options.append({"option": str(opt.get("option", ""))[:1000],
                             "conditions": [str(c)[:500] for c in opt.get("conditions", []) or []][:10],
-                            "cites": cites, "units": _num(opt.get("units")),
+                            "cites": cites, "basis": basis, "units": _num(opt.get("units")),
                             "hours": _num(opt.get("hours")), "weeks": _num(opt.get("weeks"))})
         out["options"] = options[:8]
         conf = raw.get("confidence", 0)

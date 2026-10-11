@@ -106,3 +106,12 @@ Demo run (same build, `uv run demo.py`): c1 CONVERGED; p1 CONVERGED with the ove
 recorded; e1 ESCALATED (E-01, E-04); a1 ASK_STUDENT for `hours`, CONVERGED after approval;
 d1 ASK_STUDENT for `gpa`, DISPUTED after approval; e2 ESCALATED (E-02) on the same question
 as c1 after `days_to_deadline` moved to 2.
+
+Since that run (overnight, not yet re-measured live): a department's position is now the option
+it recommends (its first), not the option the student's preferences would rank first, and its
+authority is the level of the single rule the option names as its `basis` (read from the box;
+a permission quoted in passing no longer wins an argument). `units` in an option is defined as
+the student's total load after it, so a 5-unit course no longer reads as a 5-unit load. The
+college's working-student practice (F-13) now states the load it advises, which is what makes
+d1 a dispute at equal authority rather than an accident of encoding. Re-run `uv run eval.py`
+before quoting numbers; the replay cache does not cover the new prompt.

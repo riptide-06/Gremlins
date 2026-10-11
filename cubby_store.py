@@ -35,6 +35,10 @@ class CubbyError(RuntimeError):
     pass
 
 
+class CubbyAuthError(CubbyError):
+    """Campus Cubbies no longer accepts the credential (revoked, expired, or never valid)."""
+
+
 class CubbyClient:
     """Minimal A2A 1.0 client for the Campus Cubbies tool surface."""
 
@@ -52,7 +56,7 @@ class CubbyClient:
                    "Authorization": "Bearer " + self.token}
         response = self.http.post(self.origin + "/a2a", json=body, headers=headers)
         if response.status_code == 401:
-            raise CubbyError("Campus Cubbies rejected the credential (401). Reconnect through the pairing page.")
+            raise CubbyAuthError("Campus Cubbies rejected the credential (401). Reconnect through the pairing page.")
         if response.status_code >= 400:
             raise CubbyError(f"Campus Cubbies HTTP {response.status_code}")
         envelope = response.json()

@@ -50,7 +50,7 @@ def test_log_shared_writes_section_7(store):
     line = [l for l in store.load("student").section(7).lines if "SHARED" in l][0]
     cells = [c.strip() for c in line.split("|")]
     assert cells[1:3] == ["SHARED", "iso"] and "units" in cells[3] and cells[4] == "sess-9"
-    assert "16" not in line  # fields, not values
+    assert "16" not in "|".join(cells[1:])  # fields, not values (the timestamp in front of them may well contain 16)
 
 
 def test_inbound_drops_and_counts_uncited_claims(store):

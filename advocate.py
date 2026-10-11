@@ -95,6 +95,7 @@ class Verdict:
                 "authority": self.authority, "escalations": self.escalations, "ask": self.ask,
                 "ask_by_dept": {d.dept: d.ask for d in self.depts if d.ask},
                 "shared": self.shared, "dropped": self.dropped, "brief": self.brief,
+                "failed": [d.dept for d in self.depts if d.answer.get("failed")],
                 "written": [{"section": s, "line": l} for s, l in self.written]}
 
 
@@ -236,44 +237,68 @@ class Advocate:
         # each department speaks in its own voice; a disagreement should read as one
         v.answer = " ".join(f"{r.dept.upper()}: {r.answer['answer'].strip()}" for r in answered if r.answer.get("answer"))
 
-        agreed, disputed, decides = self._positions(student, answered)
+        agreed, disputed, decides, precedence = self._positions(student, answered)
         if v.escalations or any(r.answer.get("escalate") for r in results):
             v.kind = "ESCALATED"
-            triggers = {e.id: e.text for d in {r.dept for r in results} for e in self.dept_box(d).escalations.values()}
-            v.brief = {"agreed": agreed, "disputed": disputed,
+            # E-xx ids are per box (college E-02 is not ISO's E-02): read each trigger's text from the
+            # box of the department whose answer fired it.
+            fired: list[str] = []
+            for r in results:
+                if not r.answer.get("escalate"):
+                    continue
+                try:
+                    rules = self.dept_box(r.dept).escalations
+                except (FileNotFoundError, OSError, ValueError):
+                    rules = {}
+                for c in r.answer.get("cites", []):
+                    if c.startswith("E-"):
+                        fired.append(f"{r.dept.upper()} {c}: {rules[c].text if c in rules else 'a trigger in its box matched'}")
+            v.brief = {"agreed": agreed, "disputed": disputed, "precedence": precedence,
                        "options": [o["option"] for o in v.options[:4]],
-                       "resolve": [triggers.get(e, e) for e in v.escalations] + [f"student supplies {f}" for f in v.ask],
+                       "triggers": fired,
+                       "resolve": fired + [f"student supplies {f}" for f in v.ask],
                        "decides": sorted({r.dept.upper() for r in results if r.answer.get("escalate")})}
         elif v.ask:
             v.kind = "ASK_STUDENT"
         elif disputed:
             v.kind = "DISPUTED"
-            v.brief = {"agreed": agreed, "disputed": disputed, "options": [o["option"] for o in v.options[:4]],
+            v.brief = {"agreed": agreed, "disputed": disputed, "precedence": precedence,
+                       "options": [o["option"] for o in v.options[:4]],
                        "resolve": ["a precedence rule (P-xx) or authority_order ranking one department above the other",
                                    "or a human decision"],
                        "decides": decides}
         elif answered:
             v.kind = "CONVERGED"
-            if decides:  # a conflict existed but authority_order settled it
-                v.brief = {"agreed": agreed, "precedence": decides}
+            if precedence:  # a conflict existed but authority_order settled it
+                v.brief = {"agreed": agreed, "precedence": precedence}
         return v
 
-    def _positions(self, student: Box, answered: list[DeptResult]) -> tuple[list[str], list[str], list[str]]:
-        """Compare departments by their best option's units. The authority behind a position is
-        the highest authority among the facts that option cites (not everything the department
-        mentioned), so a campus office quoting a federal rule in passing does not outrank the
-        office that administers it. Equal authority -> disputed; otherwise authority_order decides."""
-        agreed, disputed, decides = [], [], []
+    def position_authority(self, dept: str, option: dict) -> str:
+        """The authority level behind one option: the box's level for the rule the option rests on
+        (`basis`, a fact it cites), else the highest level among its cites. Read from the box, never
+        from the model's own claim."""
+        try:
+            box = self.dept_box(dept)
+        except (FileNotFoundError, OSError, ValueError):
+            return ""
+        basis = option.get("basis")
+        if basis in box.facts:
+            return box.facts[basis].authority
+        return box.highest_authority(option.get("cites", []))
+
+    def _positions(self, student: Box, answered: list[DeptResult]) -> tuple[list[str], list[str], list[str], list[str]]:
+        """Compare departments by the option each one recommends (its first), by `units`. The
+        student's preferences rank the pooled menu later; they do not decide whether two offices
+        disagree. The authority behind a position is the level of the rule it rests on, so a campus
+        office quoting a federal rule in passing does not outrank the office that administers it.
+        Equal authority -> disputed; otherwise authority_order decides. Returns (agreed, disputed,
+        decides: the departments in a dispute, precedence: who outranked whom)."""
+        agreed, disputed, decides, precedence = [], [], [], []
         best = {}
         for r in answered:
-            opts = score_options(r.answer.get("options", []), student.preferences)
-            if opts and isinstance(opts[0].get("units"), (int, float)):
-                authority = ""
-                try:
-                    authority = self.dept_box(r.dept).highest_authority(opts[0].get("cites", []))
-                except (FileNotFoundError, OSError, ValueError):
-                    pass
-                best[r.dept] = (opts[0]["units"], authority or r.answer.get("authority", ""), opts[0]["option"])
+            opts = [o for o in r.answer.get("options", []) if isinstance(o.get("units"), (int, float))]
+            if opts:
+                best[r.dept] = (opts[0]["units"], self.position_authority(r.dept, opts[0]) or r.answer.get("authority", ""), opts[0]["option"])
         depts = list(best)
         for i, a in enumerate(depts):
             for b in depts[i + 1:]:
@@ -287,12 +312,12 @@ class Advocate:
                     disputed.append(f"{a.upper()} ({auth_a}): {text_a} vs {b.upper()} ({auth_b}): {text_b}")
                     decides += [a.upper(), b.upper()]
                 else:
-                    winner = a if ra < rb else b
-                    decides.append(f"{winner.upper()} wins by authority_order ({best[winner][1]})")
+                    winner, loser = (a, b) if ra < rb else (b, a)
+                    precedence.append(f"{winner.upper()} wins by authority_order ({best[winner][1]}) over {loser.upper()} ({best[loser][1]})")
                     agreed.append(f"{winner.upper()} position stands: {best[winner][2]}")
         if len(answered) == 1 and not agreed and not disputed:
             agreed.append(f"{answered[0].dept.upper()} is the only department in scope")
-        return agreed, disputed, sorted(set(decides))
+        return agreed, disputed, sorted(set(decides)), precedence
 
     # -- writing back ----------------------------------------------------------------
     def write(self, v: Verdict) -> None:

@@ -38,7 +38,7 @@ from starlette.routing import Route
 
 from advocate import DEPARTMENTS, Advocate, build_depts, dept_urls_from_env
 from box import MarkdownBoxStore, seed_student_box
-from cubby_store import CubbyBoxStore, CubbyClient, CubbyError
+from cubby_store import CubbyAuthError, CubbyBoxStore, CubbyClient, CubbyError
 from mcp_server import CURRENT_ADVOCATE, build_mcp
 
 logger = logging.getLogger("gremlin")
@@ -67,7 +67,7 @@ class Settings:
     cubby_url: str = os.getenv("CUBBY_URL", "https://cubby.bayleaf.dev").rstrip("/")
     session_secret: str = os.getenv("SESSION_SECRET", "")
     local_http: bool = os.getenv("LOCAL_HTTP") == "1"
-    box_dir: str = os.getenv("BOX_DIR", str(Path(__file__).with_name("docs") / "boxes"))
+    box_dir: str = os.getenv("BOX_DIR", str(Path(__file__).with_name("docs") / "boxes"))   # tracked boxes: served from a copy under out/
     demo_token: str = os.getenv("DEMO_TOKEN", "")
     demo_box: str = os.getenv("DEMO_BOX", "student")
     hello_ttl: int = 300
@@ -111,10 +111,26 @@ class Pairing:
         raise CubbyError(f"pairing exchange failed ({r.status_code})")
 
 
+DEFAULT_BOX_DIR = str(Path(__file__).with_name("docs") / "boxes")
+WORK_BOX_DIR = Path(__file__).with_name("out") / "boxes"
+
+
+def working_boxes(box_dir: str) -> MarkdownBoxStore:
+    """Every answer appends a session line to the department boxes and the judge's student box.
+    When the boxes are the tracked ones under docs/, work on a copy under out/ (gitignored) so a
+    local run never dirties the repository; an explicit BOX_DIR is used as is."""
+    if Path(box_dir).resolve() != Path(DEFAULT_BOX_DIR).resolve():
+        return MarkdownBoxStore(box_dir)
+    WORK_BOX_DIR.mkdir(parents=True, exist_ok=True)
+    for src in Path(box_dir).glob("*.md"):
+        (WORK_BOX_DIR / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    return MarkdownBoxStore(str(WORK_BOX_DIR))
+
+
 def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None = None, brain=None,
                cubby_http: httpx.Client | None = None) -> Starlette:
     settings = settings or Settings()
-    boxes = boxes or MarkdownBoxStore(settings.box_dir)
+    boxes = boxes or working_boxes(settings.box_dir)
     http = cubby_http or httpx.Client(timeout=30)
     pairing = Pairing(settings.cubby_url, http)
     urls = dept_urls_from_env()
@@ -279,8 +295,13 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         return JSONResponse({"ok": True})
 
     # ---- the gremlin ---------------------------------------------------------------------
-    def cubby_failure(exc: Exception):
+    def cubby_failure(exc: Exception, request=None):
         emit("cubby_error", reason=type(exc).__name__)
+        if isinstance(exc, CubbyAuthError):
+            # Revoked on Campus Cubbies (revoke_agents) or expired: drop the session so the site asks to reconnect.
+            if request is not None and request.session.get("uid") == "cubby":
+                request.session.clear()
+            return JSONResponse({"error": "Campus Cubbies no longer accepts this connection. Connect again.", "reconnect": True}, status_code=401)
         return JSONResponse({"error": f"Your cubby did not answer: {str(exc)[:160]}"}, status_code=503)
 
     async def api_ask(request):
@@ -296,7 +317,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         try:
             verdict = await advocate_for(*caller).ask(question, declined=declined or None)
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
         return JSONResponse(verdict.to_dict())
 
     async def api_approve(request):
@@ -312,7 +333,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         try:
             ok = await asyncio.to_thread(wall_approve, adv.store, adv.student_box, field_name, dept)
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
         return JSONResponse({"ok": ok, "field": field_name, "dept": dept})
 
     async def api_box(request):
@@ -323,7 +344,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         try:
             box = await asyncio.to_thread(adv.store.load, adv.student_box)
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
         return JSONResponse({"box": box.text[:100_000], "fields": box.fields, "permissions": box.permissions,
                              "departments": box.departments, "preferences": box.preferences,
                              "student": "demo student (synthetic)" if caller[0] == DEMO_UID else request.session.get("identity", "you"),
@@ -344,7 +365,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
             except KeyError:
                 await asyncio.to_thread(adv.store.append, adv.student_box, 1, f"{field_name}: {value}")
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
         return JSONResponse({"ok": True, "field": field_name, "value": value})
 
     async def api_permission(request):
@@ -363,7 +384,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         except KeyError as exc:
             return JSONResponse({"ok": False, "error": f"unknown {exc}"}, status_code=400)
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
         return JSONResponse({"ok": True, "field": field_name, "dept": dept, "value": value})
 
     async def api_open_items(request):
@@ -373,7 +394,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         try:
             return JSONResponse(await asyncio.to_thread(advocate_for(*caller).open_items))
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
-            return cubby_failure(exc)
+            return cubby_failure(exc, request)
 
     async def api_reset(request):
         """Judge mode only: the synthetic student and the department session logs go back to the start."""
@@ -402,12 +423,9 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
                 return
             sess = scope.get("session") or {}
             caller = None
-            if sess.get("uid") == DEMO_UID:
-                caller = (DEMO_UID, None)
-            elif sess.get("uid") == "cubby" and sess.get("cubby_token") and sess.get("expires", 0) > time.time():
-                caller = ("cubby", sess["cubby_token"])
-            else:
-                auth = dict(scope["headers"]).get(b"authorization", b"")
+            auth = dict(scope["headers"]).get(b"authorization", b"")
+            if auth:
+                # An explicit credential decides on its own; a cookie riding along cannot rescue a bad bearer.
                 raw = auth[7:] if auth.startswith(b"Bearer ") else b""
                 if 32 <= len(raw) <= 128:
                     try:
@@ -416,6 +434,10 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
                         token = ""
                     if token and await asyncio.to_thread(identity_for, token):
                         caller = ("cubby", token)
+            elif sess.get("uid") == DEMO_UID:
+                caller = (DEMO_UID, None)
+            elif sess.get("uid") == "cubby" and sess.get("cubby_token") and sess.get("expires", 0) > time.time():
+                caller = ("cubby", sess["cubby_token"])
             if not caller:
                 emit("mcp_authentication_denied")
                 await JSONResponse({"error": "Send your Campus Cubbies bearer (Authorization: Bearer ...) or sign in on the site first."},

@@ -10,7 +10,7 @@ gcloud artifacts repositories create gremlins --repository-format=docker --locat
 IMAGE=$REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE
 gcloud builds submit --config cloudbuild.gremlins.yaml --ignore-file Dockerfile.gremlins.dockerignore --substitutions _IMAGE=$IMAGE
 gcloud run deploy $SERVICE --image $IMAGE --region $REGION \
-  --allow-unauthenticated --max-instances 1 \
+  --allow-unauthenticated --max-instances 1 --min-instances 1 \
   --set-env-vars PUBLIC_URL=https://$SERVICE-331254975906.$REGION.run.app,DEMO_TOKEN=<pick a long random string>,CUBBY_URL=https://cubby.bayleaf.dev \
   --set-secrets GROQ_API_KEY=groq-key:latest,NVIDIA_NIM_API_KEY=nim-key:latest,GEMINI_API_KEY=gemini-key:latest,SESSION_SECRET=session-secret:latest
 ```
@@ -20,7 +20,8 @@ never put a key in a file that is committed). There is no Google login to config
 students sign in through Campus Cubbies' pairing page, and `PUBLIC_URL` must be the real
 service URL so the site's same-origin checks pass.
 
-Judge link: `https://<service url>/demo?token=<DEMO_TOKEN>`. Boxes live on the container's
-filesystem (writes do not survive a new instance; `--max-instances 1` keeps one). The
+Judge link: `https://<service url>/demo?token=<DEMO_TOKEN>`. The service works on a copy of the
+boxes under `out/` inside the container (writes do not survive a new instance; `--max-instances 1`
+keeps one, `--min-instances 1` avoids a cold start while judges are looking; drop it afterwards). The
 simplest local alternative for the demo: `DEMO_TOKEN=judge LOCAL_HTTP=1 uv run uvicorn
 gremlin_app:app --port 8080 --no-access-log` and share the screen.

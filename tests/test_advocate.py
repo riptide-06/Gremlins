@@ -106,6 +106,8 @@ def test_escalated_brief_and_verdict_change_after_box_flip(store):
     after = adv.ask_sync("Can I take 9 units?", "s10")
     assert after.kind == "ESCALATED" and after.escalations == ["E-02", "E-03"]
     assert after.brief["decides"] == ["ISO"] and any("degree audit" in r for r in after.brief["resolve"])
+    # each trigger is named with its department: college E-02 is not ISO's E-02
+    assert [t.split(":")[0] for t in after.brief["triggers"]] == ["ISO E-02", "ISO E-03"]
     assert after.brief["agreed"] == ["ISO is the only department in scope"]
     six = [l for l in store.load("student").section(6).lines if "ESCALATED" in l]
     assert len(six) == 1 and "triggers=E-02,E-03" in six[0] and "decides=ISO" in six[0]
@@ -133,18 +135,22 @@ def test_score_options_follows_preferences():
     assert [o["rank"] for o in score_options(opts, [])] == [1, 2, 3, 4]
 
 
-def fake_dept(units, authority, cites=("F-01",), escalate=False):
+def fake_dept(units, authority, cites=("F-01",), escalate=False, basis=None, more=()):
+    """A department recommending `units` first; `more` adds further (units) options after it."""
     async def call(session_id, question, context):
+        first = {"option": f"{units} units", "conditions": [], "cites": list(cites), "units": units, "hours": None, "weeks": 0}
+        if basis:
+            first["basis"] = basis
+        rest = [{"option": f"{u} units", "conditions": [], "cites": list(cites), "units": u, "hours": None, "weeks": 0} for u in more]
         return {"scope": "in_scope", "answer": f"Take {units} units [F-01].", "cites": list(cites), "needs": [],
-                "options": [{"option": f"{units} units", "conditions": [], "cites": list(cites), "units": units, "hours": None, "weeks": 0}],
-                "escalate": escalate, "authority": authority, "confidence": 0.9}
+                "options": [first] + rest, "escalate": escalate, "authority": authority, "confidence": 0.9}
     return call
 
 
 def test_disputed_at_equal_authority_and_precedence_otherwise(store, tmp_path):
     # a second department whose box is the ISO box under another name
     store.write("registrar", store.load("iso").text)
-    # the authority behind a position is that of the facts its best option cites (F-07 is department level, F-01 federal)
+    # the authority behind a position is that of the facts its recommended option cites (F-07 is department level, F-01 federal)
     adv = Advocate(store=store, depts={"iso": fake_dept(12, "campus", cites=("F-07",)), "registrar": fake_dept(6, "campus", cites=("F-07",))})
     v = adv.ask_sync("How few units can I take?", "s13")
     assert v.kind == "DISPUTED" and v.brief["disputed"] and v.brief["decides"] == ["ISO", "REGISTRAR"]
@@ -152,10 +158,27 @@ def test_disputed_at_equal_authority_and_precedence_otherwise(store, tmp_path):
     assert any("DISPUTED" in l for l in store.load("student").section(6).lines)
     adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "campus", cites=("F-07",))})
     v = adv.ask_sync("How few units can I take?", "s14")
-    assert v.kind == "CONVERGED" and v.brief["precedence"] == ["ISO wins by authority_order (federal)"]
+    assert v.kind == "CONVERGED" and v.brief["precedence"] == ["ISO wins by authority_order (federal) over REGISTRAR (department)"]
     # quoting a federal rule in passing does not lift a department-level recommendation
     adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "federal", cites=("F-07",))})
     assert adv.ask_sync("How few units can I take?", "s15").kind == "CONVERGED"
+
+
+def test_position_is_the_recommendation_and_basis_sets_its_authority(store):
+    store.write("registrar", store.load("iso").text)
+    # Both offices list a 6-unit option too, which the student's preferences (fewer units) would rank
+    # first; the positions compared are still what each office recommends (12 vs 6): a dispute.
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "campus", cites=("F-07",), more=(6,)), "registrar": fake_dept(6, "campus", cites=("F-07",), more=(12,))})
+    v = adv.ask_sync("How few units can I take?", "s16")
+    assert v.kind == "DISPUTED" and v.best["units"] == 6
+    # A recommendation that cites a federal rule in passing but rests on department practice (basis F-07)
+    # stays department level: equal to the other office, so disputed rather than a win by authority.
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01", "F-07"), basis="F-07"), "registrar": fake_dept(6, "campus", cites=("F-07",))})
+    assert adv.ask_sync("How few units can I take?", "s17").kind == "DISPUTED"
+    # The same cites with the federal rule as the basis: ISO wins.
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01", "F-07"), basis="F-01"), "registrar": fake_dept(6, "campus", cites=("F-07",))})
+    v = adv.ask_sync("How few units can I take?", "s18")
+    assert v.kind == "CONVERGED" and v.brief["precedence"][0].startswith("ISO wins by authority_order (federal)")
 
 
 def test_default_advocate_builds_iso_in_process(store):

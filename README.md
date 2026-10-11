@@ -43,7 +43,7 @@ then add `https://<service>/mcp` with `Authorization: Bearer <that token>`. Tool
 **Laptop, everything local:**
 
 ```sh
-uv sync && uv run pytest -q                       # 142 tests, no network
+uv sync && uv run pytest -q                       # 146 tests, no network (incl. our service against Campus Cubbies' own server code)
 uv run preflight.py --live                        # keys, boxes, cache, ports, git, one call per model
 DEMO_TOKEN=judge LOCAL_HTTP=1 uv run uvicorn gremlin_app:app --port 8080 --no-access-log   # then open /demo?token=judge
 uv run demo.py                                    # the six judge questions in the terminal, fresh copy of the boxes
@@ -69,8 +69,8 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
  |  3. consult every department AT ONCE (asyncio.gather), none sees another  |
  |  4. wall in: drop uncited claims, reject answers that echo protected data |
  |  5. decide in code: E-xx triggers -> ESCALATED; needs -> ASK_STUDENT;     |
- |     conflicting best options -> precedence (federal > state > campus >    |
- |     department) or DISPUTED; else CONVERGED                               |
+ |     recommendations that differ -> precedence (federal > state > campus > |
+ |     department, by the rule each one rests on) or DISPUTED; else CONVERGED|
  |  6. append the verdict to the student box (sections 4 to 8, pointers)     |
  +---------------------------------------------------------------------------+
       |  A2A `answer` {session_id, question, context}   (in-process, HTTP, or SLIM)
@@ -103,7 +103,7 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 |---|---|
 | three or more autonomous agents with competing objectives | ISO (status), CMPM advising (degree plan), college advising (load and standing), financial aid (money); each answers only from its own box and its own authority level |
 | deliberate, negotiate, reach consensus without a central decision-maker | the advocate never answers from its own knowledge; departments are consulted in parallel and never see each other; agreement, precedence, and dispute are computed from their positions (`advocate.py: _positions`) |
-| genuine disagreement and a real mechanism | `p1`: college approves 10 units, ISO says status terminates: federal outranks campus, CONVERGED with the override recorded. `d1`: CMPM says add CMPM 120 now, college says not while working 10 hours: equal authority, DISPUTED, both positions kept |
+| genuine disagreement and a real mechanism | `p1`: college approves 10 units, ISO says status terminates: federal outranks campus, CONVERGED with the override recorded. `d1`: CMPM recommends adding CMPM 120 now (offered once a year), college practice says stay at or below 19 credits while working 10 hours: both rest on department practice, DISPUTED, both positions kept, the student decides. Each office's position is the option it recommends, and its authority is the level of the rule that option rests on (`basis`), read from the box, so a permission quoted in passing cannot win an argument |
 | the effect of new information | `a1`/`d1`: approving `hours` turns ASK_STUDENT into an answer or a dispute; `e2`: the same question as `c1` with `days_to_deadline` moved to 2 becomes ESCALATED |
 | comparison against a simpler baseline | `eval.py`: one LLM call given every box and the whole student box, scored by the same wall. Ten cases, live models: gremlins 9/10 correct verdicts, 0 protected fields shared; baseline 3/10, 120 protected field-sends, 33 uncited sentences shown ([docs/EVAL.md](docs/EVAL.md)) |
 | when to stop, keep the disagreement, or ask a human | UNANSWERED when nothing is in scope (`u1`), DISPUTED is kept and shown rather than resolved by a coin flip, ESCALATED names who decides and what to bring |
@@ -115,14 +115,14 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 | A2A 1.0 JSON-RPC (a2a-sdk 1.2.2) between the advocate and department gremlins | real: `dept_gremlin.py serve`, agent card, skill `answer`, `advocate.over_a2a` |
 | SLIM transport for a department | real: `gremlin_slim.py` gateway in front of the ISO gremlin, `demo.py --transport slim` when a node is up |
 | in-process callers | the default so the demo runs anywhere; the contract is identical |
-| Campus Cubbies A2A (`hello`, `list_files`, `read_file`, `create_file`, `edit_file`) | real: `cubby_store.py` keeps the student box as a file in the student's Drive cubby, exact-match edits against the revision just read |
+| Campus Cubbies A2A (`hello`, `list_files`, `read_file`, `create_file`, `edit_file`) | real: `cubby_store.py` keeps the student box as a file in the student's Drive cubby, exact-match edits against the revision just read. `tests/test_campus_integration.py` runs our service against Campus Cubbies' own server code (`prototypes/cubbies/cloud_app.py`, offline fakes): pairing, hello, the box created and edited in the cubby, `revoke_agents` logging the student out |
 | AGNTCY Directory / OASF discovery | stand-in: each box's `topics:` line is the capability record the advocate selects on; publishing the agent cards to a directory is the next step |
 | Observe | stand-in: structured JSON events on stdout and pointers-only session logs in each box |
 
 ## What was built this weekend, and what was not
 
 Built October 10 to 11: `box.py`, `brain.py`, `dept_gremlin.py`, `wall.py`, `advocate.py`,
-`mcp_server.py`, `cubby_store.py`, `baseline.py`, `eval.py`, `demo.py`, `chat.html`, the judge mode and
+`mcp_server.py`, `cubby_store.py`, `baseline.py`, `eval.py`, `demo.py`, the judge mode and
 `/api` routes in `gremlin_app.py` (the advocate service: Campus Cubbies pairing as sign-in,
 the site, judge mode, MCP), `site.html`, the four department boxes, the student template and
 demo student, `docs/CUBBY.md`, `docs/QUESTIONS.md`, and the tests.
@@ -144,8 +144,10 @@ questions went 6/10 then 9/10 as two real bugs were fixed, both described in
 - Facts marked `verified=no` are advising practice we could not confirm on a published
   page. A gremlin that relies on one says so; a department should replace it with a
   sourced line before any real use.
-- Conflict detection compares each department's best option by `units`; a disagreement
-  that is not about units is reported as agreement unless an `E-xx` trigger catches it.
+- Conflict detection compares the option each department recommends by `units`; a
+  disagreement that is not about units is reported as agreement unless an `E-xx` trigger
+  catches it. The authority behind a position comes from the rule the department names as its
+  `basis`; a model can still name the wrong rule, and the box's own level is the only check.
 - A signed-in student's box lives in their Drive through Campus Cubbies, so it survives
   anything; the judge's synthetic box lives on the container's filesystem and resets with it.
 - The session cookie carries the student's Campus Cubbies bearer (signed, httponly, 48 hours,

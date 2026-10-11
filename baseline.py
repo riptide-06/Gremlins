@@ -55,7 +55,7 @@ def baseline_answer(brain: Brain, dept_box: Box | list[Box], student_box: Box, q
     system, user = build_prompts(dept_box, student_box, question)
     raw = brain.complete(system, user, BASELINE_SCHEMA)
     out = {"scope": "out_of_scope", "answer": "", "cites": [], "needs": [], "options": [],
-           "escalate": False, "authority": "", "confidence": 0.0}
+           "escalate": False, "authority": "", "confidence": 0.0, "failed": raw is None}
     if raw is None:
         return out
     out["scope"] = raw["scope"] if raw.get("scope") in SCOPES else "out_of_scope"

@@ -461,7 +461,12 @@ SendMessage {"session_id","question","context"}</pre>
   function api(path, body){
     var opt = { headers: {'X-Gremlin': '1', 'Content-Type': 'application/json'}, credentials: 'same-origin' };
     if (body !== undefined) { opt.method = 'POST'; opt.body = JSON.stringify(body); }
-    return fetch(path, opt).then(function(r){ return r.json().then(function(j){ j.__status = r.status; return j; }); });
+    return fetch(path, opt).then(function(r){ return r.json().then(function(j){ j.__status = r.status; if (j.reconnect) reconnect(j.error); return j; }); });
+  }
+  function reconnect(why){
+    // Campus Cubbies revoked or expired this connection: back to sign-in, with the reason.
+    state.me = null; state.box = null; state.thread = []; state.lastBrief = null;
+    location.hash = '#signin'; boot().then(function(){ connectError(why || 'Connect again.'); });
   }
 
   // ---- routing --------------------------------------------------------------------
@@ -641,7 +646,7 @@ SendMessage {"session_id","question","context"}</pre>
     if (v.verdict === 'DISPUTED') return 'two offices disagree at equal authority · the disagreement is kept';
     if (v.verdict === 'ESCALATED') return 'a trigger matched in code · a human decides';
     if (v.verdict === 'ASK_STUDENT') return 'asking you first · nothing extra was shared';
-    return 'no department covers this · nothing was invented';
+    return (v.failed && v.failed.length ? 'a model failed · nothing was invented' : 'no department covers this · nothing was invented');
   }
   function receipt(v){
     var parts = Object.keys(v.shared || {}).map(function(d){ var f = v.shared[d] || []; return 'Shared with ' + shortDept(d) + ': ' + (f.length ? f.join(', ') : 'nothing'); });
@@ -655,19 +660,27 @@ SendMessage {"session_id","question","context"}</pre>
     if (v.verdict === 'ASK_STUDENT') {
       var asks = []; Object.keys(v.ask_by_dept || {}).forEach(function(d){ (v.ask_by_dept[d] || []).forEach(function(f){ asks.push({d: d, f: f}); }); });
       var val = function(f){ return state.box && state.box.fields && state.box.fields[f]; };
-      html += '<p>' + asks.map(function(a){ return shortDept(a.d) + ' can answer this, but it needs <span class="cite">' + esc(a.f) + '</span>' + (val(a.f) ? ', which your cubby marks ask-before-sharing (it says ' + esc(val(a.f)) + ')' : ', which is not in your cubby yet') + '.'; }).join(' ') + ' Share it for this question?</p>';
+      var byField = {}; asks.forEach(function(a){ (byField[a.f] = byField[a.f] || []).push(shortDept(a.d)); });
+      var fieldNames = Object.keys(byField);
+      html += '<p>' + (fieldNames.length === 1 ? byField[fieldNames[0]].join(' and ') + ' can answer this, but ' + (byField[fieldNames[0]].length > 1 ? 'they need' : 'it needs') : 'The departments can answer this, but they need') + ' ' + fieldNames.map(function(f){ return '<span class="cite">' + esc(f) + '</span>' + (fieldNames.length > 1 ? ' (' + byField[f].join(', ') + ')' : '') + (val(f) ? '' : ', not in your cubby yet'); }).join(fieldNames.length > 2 ? ', ' : ' and ') + '. ' + (fieldNames.some(function(f){ return val(f); }) ? 'Your cubby marks ' + (fieldNames.length > 1 ? 'these' : 'it') + ' ask-before-sharing. ' : '') + 'Share for this question?</p>';
       html += '<div class="mini"><span class="eyebrow">WHAT WOULD LEAVE YOUR CUBBY</span><span>' + asks.map(function(a){ return esc(a.f) + (val(a.f) ? ': ' + esc(val(a.f)) : ' (you type it in on My Cubby first)') + ' to ' + shortDept(a.d); }).join(' · ') + ' · never: name, email</span></div>';
-      html += '<div class="row">' + asks.map(function(a){ return val(a.f) ? '<button class="btn primary act-approve" data-f="' + esc(a.f) + '" data-d="' + esc(a.d) + '" style="box-shadow:3px 3px 0 var(--line)">Yes, share ' + esc(a.f) + ' with ' + esc(shortDept(a.d)) + '</button>' : '<a class="btn primary" href="#cubby" style="box-shadow:3px 3px 0 var(--line)">Add ' + esc(a.f) + ' to my cubby</a>'; }).join('') + '<button class="btn act-decline" data-fields="' + esc(asks.map(function(a){ return a.f; }).join(',')) + '">No, answer without it</button></div>';
+      var ready = asks.filter(function(a){ return val(a.f); });
+      var single = ready.length === 1;
+      html += '<div class="row">';
+      if (ready.length > 1) html += '<button class="btn primary act-approve-all" data-all="' + esc(ready.map(function(a){ return a.f + ':' + a.d; }).join(',')) + '" style="box-shadow:3px 3px 0 var(--line)">Yes, share all ' + ready.length + ' and ask again</button>';
+      html += asks.map(function(a){ return val(a.f) ? '<button class="btn' + (single ? ' primary' : '') + ' act-approve" data-f="' + esc(a.f) + '" data-d="' + esc(a.d) + '"' + (single ? ' style="box-shadow:3px 3px 0 var(--line)"' : '') + '>' + (single ? 'Yes, share ' : 'Only ') + esc(a.f) + ' with ' + esc(shortDept(a.d)) + '</button>' : '<a class="btn primary" href="#cubby" style="box-shadow:3px 3px 0 var(--line)">Add ' + esc(a.f) + ' to my cubby</a>'; }).join('');
+      html += '<button class="btn act-decline" data-fields="' + esc(asks.map(function(a){ return a.f; }).join(',')) + '">No, answer without it</button></div>';
     } else {
       if (v.answer) html += '<p>' + withCites(v.answer) + '</p>';
-      if (v.verdict === 'UNANSWERED') html += '<p>None of the departments covers this, so I\'m not going to make something up. Try a question about units, work, aid, or your major.</p>';
+      if (v.verdict === 'UNANSWERED') html += (v.failed && v.failed.length ? '<p>' + esc(v.failed.map(shortDept).join(', ')) + ' did not answer: the model behind ' + (v.failed.length > 1 ? 'them' : 'it') + ' failed or is rate-limited. Nothing was invented. Try again in a minute.</p>' : '<p>None of the departments covers this, so I\'m not going to make something up. Try a question about units, work, aid, or your major.</p>');
+      else if (v.failed && v.failed.length) html += '<p class="muted" style="font-size:12px">' + esc(v.failed.map(shortDept).join(', ')) + ' did not answer (model failure); this verdict is from the others.</p>';
       var b = v.brief || {};
       if (b.disputed && b.disputed.length) html += '<div class="grid2">' + b.disputed.map(function(d){ var halves = d.split(' vs '); return halves.map(function(h){ var m = /^([A-Z]+) \(([a-z]*)\): (.*)$/.exec(h); return '<div class="mini"><span class="eyebrow">' + (m ? esc(m[1]) + ' SAYS · ' + esc(m[2].toUpperCase() || 'UNRANKED') : 'POSITION') + '</span><span>' + esc(m ? m[3] : h) + '</span></div>'; }).join(''); }).join('') + '</div>';
       if (v.verdict === 'DISPUTED') html += '<div class="why"><strong style="font-size:12px">Why this is disputed, not averaged</strong><span>Both positions rest on rules of the same rank, so no precedence applies. Both are kept in your cubby. ' + (b.decides && b.decides.length ? 'Who decides: you, with ' + esc(b.decides.join(' and ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'ESCALATED') html += '<div class="why"><strong style="font-size:12px">Why a person has to look at this</strong><span>' + esc((b.resolve || []).join(' ') || 'A trigger in the policy box matched your situation.') + (b.decides && b.decides.length ? ' Decides: ' + esc(b.decides.join(', ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'CONVERGED' && b.precedence && b.precedence.length) html += '<div class="why"><strong style="font-size:12px">Precedence applied</strong><span>' + esc(b.precedence.join('; ')) + (b.agreed && b.agreed.length ? ' ' + esc(b.agreed.join('; ')) : '') + '</span></div>';
       if (v.options && v.options.length) html += '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px"><strong style="font-size:12px">Your options, ranked by your preferences</strong>' + v.options.map(function(o){ var attrs = ['units','hours','weeks'].filter(function(k){ return o[k] != null; }).map(function(k){ return k + ' ' + o[k]; }).join(', '); return '<span>' + o.rank + '. ' + esc(o.option) + ' <span class="chip">' + esc(shortDept(o.dept)) + '</span> ' + cites(o.cites) + (attrs ? ' <span class="muted">(' + esc(attrs) + ')</span>' : '') + (o.conditions && o.conditions.length ? '<div class="muted" style="font-size:12px">if: ' + esc(o.conditions.join('; ')) + '</div>' : '') + '</span>'; }).join('') + '</div>';
-      if (v.escalations && v.escalations.length) html += '<span class="receipt">triggers fired in code: ' + cites(v.escalations) + '</span>';
+      if (v.escalations && v.escalations.length) html += '<span class="receipt">triggers fired in code: ' + cites((b.triggers && b.triggers.length) ? b.triggers.map(function(t){ return t.split(':')[0]; }) : v.escalations) + '</span>';
     }
     html += '<span class="receipt">' + esc(receipt(v)) + '</span>';
     var actions = [];
@@ -690,6 +703,12 @@ SendMessage {"session_id","question","context"}</pre>
       var g = addReply(renderReply(v, question));
       if (v.verdict === 'ESCALATED' || v.verdict === 'DISPUTED') state.lastBrief = {v: v, q: question};
       g.querySelectorAll('.act-approve').forEach(function(b){ b.onclick = function(){ api('/api/approve', {field: b.dataset.f, dept: b.dataset.d}).then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + b.dataset.f + ' with ' + shortDept(b.dataset.d) + ' for this question.'}); }); }; });
+      g.querySelectorAll('.act-approve-all').forEach(function(b){ b.onclick = function(){
+        var pairs = b.dataset.all.split(',').map(function(p){ var x = p.split(':'); return {field: x[0], dept: x[1]}; });
+        var chain = Promise.resolve();
+        pairs.forEach(function(pr){ chain = chain.then(function(){ return api('/api/approve', pr); }); });
+        chain.then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + pairs.map(function(pr){ return pr.field + ' with ' + shortDept(pr.dept); }).join(', ') + ' for this question.'}); });
+      }; });
       g.querySelectorAll('.act-decline').forEach(function(b){ b.onclick = function(){ ask(question, b.dataset.fields.split(','), {color: 'var(--card)', text: 'No, answer without it.'}); }; });
       loadBox();
     }).catch(function(){ pending.remove(); addReply('<p class="err">This server did not answer. Try again.</p>'); }).then(function(){ state.busy = false; $('send').disabled = false; });
@@ -718,7 +737,7 @@ SendMessage {"session_id","question","context"}</pre>
       + block('PRECEDENCE', esc((b.precedence || []).join('; ')))
       + block('OPTIONS', (b.options || []).map(function(o, i){ return String.fromCharCode(97 + i) + '. ' + esc(o); }).join('<br>'))
       + block('WHAT WOULD RESOLVE IT', esc((b.resolve || []).join(' · ')))
-      + block('TRIGGERS', cites(v.escalations))
+      + block('TRIGGERS', cites((b.triggers && b.triggers.length) ? b.triggers.map(function(t){ return t.split(':')[0]; }) : v.escalations))
       + block('CITED', cites(v.cites))
       + block('CONTEXT THE ADVISOR RECEIVES', '<span class="muted" style="font-size:13px">' + esc(ctx) + '. Not included: name, email, or any field marked no or never. The student is identified by the appointment, not by this brief.</span>')
       + '</div><div class="row"><a class="btn primary" href="#cubby">Open my cubby</a><a class="btn" href="#chat">Back to the chat</a></div>';
