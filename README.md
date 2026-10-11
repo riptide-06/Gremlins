@@ -44,7 +44,7 @@ uv run demo.py                                    # the six judge questions, fou
 uv run eval.py                                    # ten cases: gremlins vs one-call baseline
 uv run mcp_server.py                              # the advocate over MCP (stdio) for Claude Desktop / Claude Code
 uv run dept_gremlin.py serve --dept cmpm --port 10002   # a department gremlin as its own A2A server
-DEMO_TOKEN=judge LOCAL_HTTP=1 uv run uvicorn cloud_app:app --port 8080 --no-access-log   # then open /demo?token=judge
+DEMO_TOKEN=judge LOCAL_HTTP=1 uv run uvicorn gremlin_app:app --port 8080 --no-access-log   # then open /demo?token=judge
 ```
 
 Model keys go in `.env` (`GROQ_API_KEY`, `NVIDIA_NIM_API_KEY`, `GEMINI_API_KEY`; any
@@ -116,7 +116,8 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 
 Built October 10 to 11: `box.py`, `brain.py`, `dept_gremlin.py`, `wall.py`, `advocate.py`,
 `mcp_server.py`, `baseline.py`, `eval.py`, `demo.py`, `chat.html`, the judge mode and
-`/api` routes in `cloud_app.py`, the four department boxes, the student template and
+`/api` routes in `gremlin_app.py` (the advocate service, grown from the Firestore
+prototype's login), the four department boxes, the student template and
 demo student, `docs/CUBBY.md`, `docs/QUESTIONS.md`, and the tests.
 
 Pre-existing (Adam Smith's Campus Cubbies / BayLeaf work and the earlier memory

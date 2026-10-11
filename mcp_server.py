@@ -8,7 +8,7 @@ stdio (Claude Desktop, Claude Code):
 Claude Desktop config:
     {"mcpServers": {"gremlin": {"command": "uv", "args": ["run", "--directory", "<repo>", "mcp_server.py"]}}}
 
-Streamable HTTP: cloud_app.py mounts build_mcp(...) at /mcp behind the UCSC
+Streamable HTTP: gremlin_app.py mounts build_mcp(...) at /mcp behind the UCSC
 login (session cookie or student bearer). The caller's advocate is resolved
 per request through a ContextVar, so one server instance serves many students
 and never holds a student box between calls.

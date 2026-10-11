@@ -13,7 +13,7 @@ from a2a.helpers import new_text_message
 from a2a.types import Role, SendMessageRequest
 from google.protobuf.json_format import MessageToDict
 
-from cloud_app import Settings, create_app, digest
+from gremlin_app import Settings, create_app, digest
 
 
 class TestStore:
@@ -180,15 +180,17 @@ async def test_public_routes_never_expose_state(setup):
             assert (await http.get(path)).status_code == 404
 
 
-def test_downloads_are_in_deployment_package():
-    root = Path(__file__).parent
-    dockerfile = (root / "Dockerfile").read_text()
+def test_gremlin_image_ships_every_module_it_imports():
+    root = Path(__file__).resolve().parent.parent
+    dockerfile = (root / "Dockerfile.gremlins").read_text()
     copies = [line.split()[1:-1] for line in dockerfile.splitlines()
               if line.startswith("COPY ") and "--from=" not in line]
-    for asset in ("cloud_app.py", "gremlin_client.py", "gremlin_slim.py", "SLIM.md"):
+    ignore = (root / "Dockerfile.gremlins.dockerignore").read_text().splitlines()
+    for asset in ("gremlin_app.py", "chat.html", "box.py", "brain.py", "dept_gremlin.py", "wall.py", "advocate.py", "mcp_server.py"):
         assert any(asset in files for files in copies), f"Missing Docker image asset: {asset}"
-        for ignore in (".dockerignore", ".gcloudignore"):
-            assert "!" + asset in (root / ignore).read_text().splitlines()
+        assert "!" + asset in ignore, f"{asset} is excluded by the dockerignore"
+    assert any("docs/boxes" in " ".join(files) for files in copies) and "!docs/boxes" in ignore
+    assert "gremlin_app:app" in dockerfile
 
 
 async def test_concurrent_caller_identity_does_not_bleed(setup):
@@ -219,7 +221,7 @@ async def test_application_logs_redact_content_and_tokens(setup, caplog):
 def judge_app(tmp_path, brain):
     import shutil
     from box import MarkdownBoxStore
-    src = MarkdownBoxStore(Path(__file__).parent / "docs" / "boxes")
+    src = MarkdownBoxStore(Path(__file__).resolve().parent.parent / "docs" / "boxes")
     for name in ("iso", "cmpm", "college", "finaid", "student"):
         shutil.copy(src.path(name), tmp_path / f"{name}.md")
     settings = Settings(url="http://test", client_id="test-id", client_secret="test-secret", session_secret="test-session-secret",

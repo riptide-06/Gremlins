@@ -523,14 +523,22 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
         request.session.clear()
         return RedirectResponse("/", status_code=303)
 
+    def legacy(name, *folders):
+        """Historical prototype files: at the repo root before the restructure, under prototypes/ after it."""
+        here = Path(__file__).resolve().parent
+        for candidate in [here / name, *[here / "prototypes" / f / name for f in folders]]:
+            if candidate.exists():
+                return FileResponse(candidate, media_type="text/plain", headers={"X-Content-Type-Options": "nosniff"})
+        return JSONResponse({"error": "not shipped in this build"}, status_code=404)
+
     async def download(request):
-        return FileResponse(Path(__file__).with_name("gremlin_client.py"), media_type="text/plain", headers={"X-Content-Type-Options": "nosniff"})
+        return legacy("gremlin_client.py", "firestore", "slim")
 
     async def slim_download(request):
-        return FileResponse(Path(__file__).with_name("gremlin_slim.py"), media_type="text/plain", headers={"X-Content-Type-Options": "nosniff"})
+        return legacy("gremlin_slim.py", "slim")
 
     async def slim_instructions(request):
-        return FileResponse(Path(__file__).with_name("SLIM.md"), media_type="text/plain", headers={"X-Content-Type-Options": "nosniff"})
+        return legacy("SLIM.md", "slim")
 
     async def health(request):
         return JSONResponse({"ok": True})

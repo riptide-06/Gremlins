@@ -229,7 +229,8 @@ class Advocate:
         v.cites = sorted({c for r in results for c in r.answer.get("cites", [])}
                          | {c for o in pooled for c in o.get("cites", [])})
         v.authority = student.highest_authority(v.cites) or next((r.answer.get("authority", "") for r in answered), "")
-        v.answer = " ".join(r.answer["answer"] for r in answered if r.answer.get("answer"))
+        # each department speaks in its own voice; a disagreement should read as one
+        v.answer = " ".join(f"{r.dept.upper()}: {r.answer['answer'].strip()}" for r in answered if r.answer.get("answer"))
 
         agreed, disputed, decides = self._positions(student, answered)
         if v.escalations or any(r.answer.get("escalate") for r in results):

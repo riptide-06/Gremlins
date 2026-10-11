@@ -351,7 +351,7 @@ class MarkdownBoxStore:
 class GoogleDocBoxStore:
     """TODO: read a box straight from the student's Google Doc.
 
-    Plan: reuse the Google OAuth client registered in cloud_app.create_app,
+    Plan: reuse the Google OAuth client registered in gremlin_app.create_app,
     request the additional scope `https://www.googleapis.com/auth/documents.readonly`,
     call `documents.get(documentId)` and flatten `body.content` paragraphs to
     Markdown lines before handing them to parse_box. Appends go through

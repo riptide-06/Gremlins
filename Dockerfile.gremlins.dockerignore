@@ -1,11 +1,8 @@
 *
-!Dockerfile
+!Dockerfile.gremlins
 !pyproject.toml
 !uv.lock
-!cloud_app.py
-!gremlin_client.py
-!gremlin_slim.py
-!SLIM.md
+!gremlin_app.py
 !box.py
 !brain.py
 !dept_gremlin.py

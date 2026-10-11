@@ -41,6 +41,8 @@ from wall import approve
 
 HERE = Path(__file__).resolve().parent
 BOXES = HERE / "docs" / "boxes"
+SLIM_SCRIPT = next((p for p in (HERE / "gremlin_slim.py", HERE / "prototypes" / "slim" / "gremlin_slim.py") if p.exists()),
+                   HERE / "prototypes" / "slim" / "gremlin_slim.py")
 SLIM_NODE = ("127.0.0.1", 46357)
 DEPT_PORT = 10001
 GATEWAY_NAME = "ucsc/gremlins/iso"
@@ -95,7 +97,7 @@ class SlimTransport:
             raise RuntimeError("dept_gremlin.py did not come up on port 10001")
         self.log(f"  [slim] ISO gremlin up on http://127.0.0.1:{DEPT_PORT}")
         gateway = subprocess.Popen([
-            "uv", "run", "--script", "gremlin_slim.py", "gateway", "--upstream", f"http://127.0.0.1:{DEPT_PORT}", "--name", GATEWAY_NAME],
+            "uv", "run", "--script", str(SLIM_SCRIPT), "gateway", "--upstream", f"http://127.0.0.1:{DEPT_PORT}", "--name", GATEWAY_NAME],
             cwd=HERE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         self.procs.append(gateway)
         deadline = time.time() + 120
@@ -112,7 +114,7 @@ class SlimTransport:
         async def call(session_id: str, question: str, context: dict) -> dict:
             request = json.dumps({"session_id": session_id, "question": question, "context": context}, ensure_ascii=False)
             proc = await asyncio.to_thread(subprocess.run, [
-                "uv", "run", "--script", "gremlin_slim.py", "answer", request, "--name", GATEWAY_NAME],
+                "uv", "run", "--script", str(SLIM_SCRIPT), "answer", request, "--name", GATEWAY_NAME],
                 cwd=HERE, env={**os.environ, "GREMLIN_TOKEN": self.token}, capture_output=True, text=True, timeout=180)
             for line in reversed(proc.stdout.strip().splitlines()):
                 if line.startswith("{"):

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 from advocate import Advocate, DeptGremlin, in_process
 from box import MarkdownBoxStore
 from brain import ScriptedBrain
-from cloud_app import Settings, create_app, student_box_name
+from gremlin_app import Settings, create_app, student_box_name
 from conftest import good_answer
 from mcp_server import build_mcp
 
@@ -74,8 +74,8 @@ async def test_no_signed_in_student_is_an_error():
         await mcp.call_tool("open_items", {})
 
 
-# ---- cloud_app route --------------------------------------------------------
-from test_cloud import TestStore, claims, sign_in  # noqa: E402  (same fake store and OIDC claims)
+# ---- gremlin_app route --------------------------------------------------------
+from test_gremlin_app import TestStore, claims, sign_in  # noqa: E402  (same fake store and OIDC claims)
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ async def test_first_login_seeds_a_student_box(cloud, store):
     app, fake = cloud
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
         assert (await sign_in(app, http, claims(name="Sam Synthetic"))).status_code == 303
-        from cloud_app import digest
+        from gremlin_app import digest
         name = student_box_name(digest("google-subject"))
         box = store.load(name)
         assert box.fields["name"] == "Sam Synthetic" and box.fields["email"] == "student@ucsc.edu"
