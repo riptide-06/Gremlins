@@ -115,3 +115,11 @@ the student's total load after it, so a 5-unit course no longer reads as a 5-uni
 college's working-student practice (F-13) now states the load it advises, which is what makes
 d1 a dispute at equal authority rather than an accident of encoding. Re-run `uv run eval.py`
 before quoting numbers; the replay cache does not cover the new prompt.
+
+Sunday morning live run (new prompt, cold cache): gremlins 9/10, baseline 2/10; 13 uncited claims
+deleted by the wall vs 22 shown; 143 fields left the box (0 protected) vs 210 (120 protected). Two
+department calls hit a Groq rate limit (e1, x1) and the verdicts still landed, because escalation is
+decided in code. The one miss is a judgment call, not a crash: a2 (a 20-hour CPT internship) came back
+CONVERGED without asking for the student's on-campus hours. ISO's own rule (F-12) caps CPT and
+on-campus work at 20 hours each, so the on-campus number does not change the yes; asking would have
+been careful, not required. The expectation stays ASK_STUDENT and the miss stays in the table.

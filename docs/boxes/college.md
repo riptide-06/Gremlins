@@ -48,6 +48,7 @@ Q-03 | What does probation mean for me? | Term or cumulative GPA below 2.0 puts 
 Q-04 | Can I take next quarter off? | A leave is filed through the college, and an F-1 student must coordinate it with ISSP first because it changes the SEVIS record [F-11].
 Q-05 | How do I get the part-time fee reduction? | Apply in MyUCSC through the Undergraduate Student eForms tile with your documentation by the quarter's deadline; the program caps you at 10 credits and halves tuition [F-06] [F-07].
 Q-06 | When is the last day to drop without a W? | The add/drop/swap deadline on the Registrar's key dates calendar; after it, a drop becomes a W until the withdraw deadline [F-12].
+Q-07 | Should I add a course now and go to 20 or more units, or wait, if I'm working? | Crown advising recommends waiting or dropping something to stay at or below 19 credits while you work 10 or more hours a week, and planning a heavier quarter with an adviser before adding the course [F-13]. Enrollment up to 22 is permitted at a 2.50 GPA [F-05], but permitted is not the same as advised.
 
 ## 4. Escalation
 
