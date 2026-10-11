@@ -647,7 +647,7 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
         assert (await http.post("/a2a", json={"method": "SendMessage"})).status_code == 401
         landing = (await http.get("/")).text
         assert "Give your agent this address" in landing and system.settings.url in landing
-        assert 'href="https://bayleaf.dev"' in landing
+        assert 'href="https://chat.bayleaf.dev/?model=basic&amp;tools=lathe&amp;q=Help%20me%20set%20up%20my%20Campus%20Cubby.%20Start%20with%20the%20public%20agent%20guide%20at%20https%3A%2F%2Fcubby.bayleaf.dev%2FSKILL.md%20We%20trust%20BayLeaf%20inference.&amp;submit=false">Try Cubbies via Bayleaf Chat</a>' in landing
         assert "<details>" not in landing and "Instructions for agents" not in landing
         assert "A2A" not in landing and "Python" not in landing
         assert "can’t peek at what’s inside" in landing

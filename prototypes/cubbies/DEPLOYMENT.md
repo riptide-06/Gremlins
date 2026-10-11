@@ -424,3 +424,15 @@ Pre/post comparison confirms unchanged runtime/build identities, all environment
 and version-pinned secret bindings, resource/one-instance limits, ingress and
 public invoker IAM. Cloudflare was not changed. No live pairing, consent, private
 reads, authenticated operations, OWUI mutation or commit was performed.
+
+## BayLeaf Chat landing link
+
+October 11, 2026: deployed as **`gremlin-00027-qdf`**, serving 100% traffic.
+The “Don’t have an agent?” link is now **Try Cubbies via Bayleaf Chat**, with
+the requested Basic/Lathe setup prompt and `submit=false`. Parsed local and live
+custom-domain HTML confirm the exact requested href and label. The three relevant
+existing landing/public HTTP tests pass after updating the old homepage-link
+assertion; no new tests were added. Runtime/build identities, environment and
+secret bindings, resource/one-instance limits, ingress and public invoker IAM
+are unchanged. Cloudflare was not changed. No chat was submitted, and no pairing,
+consent, private operations, commit or push occurred. Illustrations are preserved.
