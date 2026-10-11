@@ -114,7 +114,7 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 | deliberate, negotiate, reach consensus without a central decision-maker | the advocate never answers from its own knowledge; departments are consulted in parallel and never see each other; agreement, precedence, and dispute are computed from their positions (`advocate.py: _positions`) |
 | genuine disagreement and a real mechanism | `p1`: college approves 10 units, ISO says status terminates: federal outranks campus, CONVERGED with the override recorded. `d1`: CMPM says add CMPM 120 now, college says not while working 10 hours: equal authority, DISPUTED, both positions kept |
 | the effect of new information | `a1`/`d1`: approving `hours` turns ASK_STUDENT into an answer or a dispute; `e2`: the same question as `c1` with `days_to_deadline` moved to 2 becomes ESCALATED |
-| comparison against a simpler baseline | `eval.py`: one LLM call given every box and the whole student box, scored by the same wall ([docs/EVAL.md](docs/EVAL.md)) |
+| comparison against a simpler baseline | `eval.py`: one LLM call given every box and the whole student box, scored by the same wall. Ten cases, live models: gremlins 9/10 correct verdicts, 0 protected fields shared; baseline 3/10, 120 protected field-sends, 33 uncited sentences shown ([docs/EVAL.md](docs/EVAL.md)) |
 | when to stop, keep the disagreement, or ask a human | UNANSWERED when nothing is in scope (`u1`), DISPUTED is kept and shown rather than resolved by a coin flip, ESCALATED names who decides and what to bring |
 
 ## AGNTCY: what is real and what is a stand-in
@@ -144,8 +144,9 @@ echo prototype. The BayLeaf brain (`brain.BayleafBrain`) is a stub with the inte
 fixed. The Markdown store is the default; `cubby_store.py` is the same box living in
 the real cubby.
 
-Eval questions and the department prompt were iterated during development; the
-numbers in `docs/EVAL.md` are from the final run, not a held-out set.
+Eval questions and the department prompt were iterated during development (the same ten
+questions went 6/10 then 9/10 as two real bugs were fixed, both described in
+`docs/EVAL.md`); the numbers are from the final run, not a held-out set.
 
 ## Limits we know about
 

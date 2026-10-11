@@ -59,9 +59,50 @@ Reproduce: `uv run eval.py --json`. Model output varies slightly between runs ev
 
 ## Run 2: four departments, ten cases (docs/QUESTIONS.md)
 
-Pending: run `uv run eval.py` on a machine with model keys and paste the table here.
-Expected shape: the gremlin condition should be correct on the verdicts that are decided in
-code (ESCALATED, ASK_STUDENT, UNANSWERED, DISPUTED) regardless of the model, and the
-baseline should keep leaking every protected field because the whole student box is in its
-prompt. Where the gremlin misses, the miss is in the model's `needs` or `options`, which the
-case notes in QUESTIONS.md call out.
+Run on 2026-10-11 00:50 PT, live models (groq/openai/gpt-oss-120b first, nvidia_nim
+nemotron-3-super fallback), temperature 0, JSON mode, replay cache cold. The gremlin
+condition is the advocate plus four department gremlins (ISO, CMPM advising, Crown
+college advising, financial aid) behind the wall; the baseline is one model call given all
+four boxes and the whole student box.
+
+condition | correct outcome | uncited claims | student fields that left the box (protected)
+--- | --- | --- | ---
+gremlin | 9/10 | 16, every one deleted by the wall before the student saw it | 144 (0)
+baseline | 3/10 | 33, all shown to the student | 210 (120)
+
+case | expected | gremlin | asked | baseline
+--- | --- | --- | --- | ---
+c1 | CONVERGED | CONVERGED | iso,cmpm,college,finaid | ASK_STUDENT
+c2 | CONVERGED | CONVERGED | iso,cmpm | CONVERGED
+p1 | CONVERGED (precedence) | CONVERGED | iso,cmpm,college,finaid | ASK_STUDENT
+e1 | ESCALATED | ESCALATED | iso,cmpm,college,finaid | ESCALATED
+e2 | ESCALATED | ESCALATED | iso,cmpm,college,finaid | CONVERGED
+a1 | ASK_STUDENT | ASK_STUDENT | iso,college | ESCALATED
+a2 | ASK_STUDENT | CONVERGED (a model call failed on the fallback path) | iso,cmpm,college,finaid | CONVERGED
+d1 | DISPUTED or CONVERGED by precedence | DISPUTED | iso,cmpm,college,finaid | CONVERGED
+u1 | UNANSWERED | UNANSWERED | iso,cmpm,college,finaid | ASK_STUDENT
+x1 | ESCALATED | ESCALATED (one model call failed, verdict still decided in code) | iso,cmpm,college,finaid | UNANSWERED
+
+How to read it. "Student fields that left the box" counts profile fields present in what a
+model saw, summed over cases; the gremlin shares only permitted, relevant fields per
+department (144 field-sends over ten cases, none of them `no`/`never` fields), the baseline
+pastes the whole box every time (210, of which 120 are fields the student marked `no` or
+`never`, name and email included). The baseline's "correct" column is its self-reported
+verdict mapped onto the same vocabulary; it has no wall, so a right verdict there still comes
+with uncited, unverifiable sentences.
+
+The one miss (a2) coincided with a provider rate limit during the burst; the sibling question
+a1 asked for `hours` correctly in the same run and in the demo. The eval table now prints the
+failure class next to the verdict so this is visible in future runs.
+
+What changed between run 1 of this eval (6/10, same morning) and this run: departments were
+asking for invented field names (`issp_approval`, `CMPM_120_modality`), which stalled
+questions as ASK_STUDENT; needs are now normalized onto the student vocabulary in code, and a
+position's authority in a conflict comes from the facts under its best option rather than
+everything the office mentioned (financial aid quoting a federal Pell rule had tied with ISO).
+These are development-time iterations on the same ten questions, not a held-out result.
+
+Demo run (same build, `uv run demo.py`): c1 CONVERGED; p1 CONVERGED with the override
+recorded; e1 ESCALATED (E-01, E-04); a1 ASK_STUDENT for `hours`, CONVERGED after approval;
+d1 ASK_STUDENT for `gpa`, DISPUTED after approval; e2 ESCALATED (E-02) on the same question
+as c1 after `days_to_deadline` moved to 2.

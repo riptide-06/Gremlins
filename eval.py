@@ -80,12 +80,15 @@ def run_gremlin(case: Case, store: MarkdownBoxStore, brain: Brain) -> dict:
     student = store.load("student")
     left = {f for fields in v.shared.values() for f in fields}
     left_protected = {f for dept, fields in v.shared.items() for f in fields if student.permission(f, dept) in ("no", "never")}
-    failed = False
+    failures = []
     for d in DEPARTMENTS:
         log = store.load(d).section(5)
-        failed = failed or any("brain_failed" in l for l in (log.lines if log else []))
+        for l in (log.lines if log else []):
+            if "brain_failed" in l:
+                failures.append(d + ":" + l.split("brain_failed:")[-1].strip()[:60])
     return {"outcome": v.kind, "uncited": v.dropped, "left": sorted(left), "left_protected": sorted(left_protected),
-            "asked": [r.dept for r in v.depts], "answer": v.answer[:200], "brief": v.brief, "brain_failed": failed}
+            "asked": [r.dept for r in v.depts], "answer": v.answer[:200], "brief": v.brief,
+            "brain_failed": bool(failures), "failures": failures}
 
 
 def run_baseline(case: Case, store: MarkdownBoxStore, brain: Brain) -> dict:
@@ -130,7 +133,7 @@ def format_table(result: dict) -> str:
     lines.append("case | expected | gremlin | asked | baseline")
     lines.append("--- | --- | --- | --- | ---")
     for r in result["rows"]:
-        flag = " (brain failed)" if r["gremlin"].get("brain_failed") else ""
+        flag = (" (brain failed: " + "; ".join(r["gremlin"].get("failures", []))[:80] + ")") if r["gremlin"].get("brain_failed") else ""
         asked = ",".join(r["gremlin"].get("asked", []))
         lines.append(f"{r['case']} | {r['expected']} | {r['gremlin']['outcome']}{flag} | {asked} | {r['baseline']['outcome']}")
     return "\n".join(lines)
