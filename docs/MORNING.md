@@ -41,7 +41,7 @@ session lines. `/mcp` with the Campus Cubbies token works the same way (Bring yo
 
 Judge link on the same server: http://127.0.0.1:8080/demo?token=judge
 
-## 4. Deploy (optional, docs/DEPLOY_GREMLINS.md), then push
+## 4. Put it on the internet (free: docs/DEPLOY_FREE.md; paid: docs/DEPLOY_GREMLINS.md), then push
 
 ```sh
 git push -u origin night2-boxes-gremlins
