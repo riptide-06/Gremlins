@@ -28,3 +28,17 @@ and it hits every Level 3 criterion: three agents with different objectives,
 negotiation with no central decision-maker, the effect of new information (a1,
 d1, e2), a baseline comparison (eval table), and when to stop, keep the
 disagreement, or ask a human (u1, d1, e1).
+
+## The demo word
+
+Any question prefixed with `demo:` runs in deliberation mode and streams the offices' turns to the
+chat (`POST /api/ask_stream`, server-sent events; `ask(question, deliberate=true)` over MCP):
+
+| round | who speaks | what crosses between offices |
+|---|---|---|
+| 1 | every office in scope, in parallel | nothing: none sees another |
+| 2 | an office named in another office's `refers` (its box says that office decides part of this), if the student's permissions table knows it | the referring office's recommended option, its cites, its authority level, its cited answer text |
+| 3 | offices whose positions differ (a dispute at equal authority, or one outranked by another), once | each other's cited positions; each answers with `stance` hold, revise, or agree, citing its own box |
+
+Student fields never cross between offices. The verdict carries `transcript` and
+`brief.deliberation`, and section 4 of the student box gets a `DELIBERATION` line.

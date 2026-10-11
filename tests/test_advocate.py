@@ -1,5 +1,6 @@
 """Advocate: minimal sharing, resend round, verdicts, preference scoring, writes to the student box."""
 import asyncio
+import re
 
 import pytest
 
@@ -196,3 +197,77 @@ def test_declined_ask_field_is_sent_as_not_shared_and_does_not_stall(store):
     assert v.kind == "CONVERGED" and v.ask == []            # no ASK_STUDENT: the student already said no
     assert context_of(brain, 0)["hours"] == "not shared"    # the department was told it was withheld
     assert v.depts[0].blocked == ["hours"]
+
+
+def scripted_dept(dept, store, answers):
+    """A department gremlin that returns the given answers in order (each a dict for one call)."""
+    brain = ScriptedBrain(list(answers), default=answers[-1])
+    return in_process(DeptGremlin(dept, store=store, brain=brain)), brain
+
+
+def position(units, text, cites=("F-01",), **extra):
+    a = {"scope": "in_scope", "answer": text, "cites": list(cites), "needs": [],
+         "options": [{"option": f"{units} units", "conditions": [], "cites": list(cites), "units": units, "hours": None, "weeks": 0}],
+         "confidence": 0.9}
+    a.update(extra)
+    return a
+
+
+def test_referral_pulls_a_named_office_into_round_two(store):
+    # ISO's box names financial aid as the office that decides the money side: with `deliberate`
+    # the finaid gremlin joins round 2 and sees ISO's cited position, but not ISO's student fields.
+    # the registrar's box advertises topics nothing here matches, so it is never in scope by itself
+    text = store.load("iso").text
+    text = re.sub(r"^topics: .*$", "topics: zzz-never-asked", text, flags=re.M) if "\ntopics:" in text else text.replace("\n", "\ntopics: zzz-never-asked\n", 1)
+    store.write("registrar", text)
+    iso, iso_brain = scripted_dept("iso", store, [position(12, "Stay at 12 [F-01].", refers=["registrar", "finaid"])])
+    reg, reg_brain = scripted_dept("registrar", store, [position(12, "Fine at 12 [F-01].")])
+    adv = Advocate(store=store, depts={"iso": iso, "registrar": reg})
+    plain = adv.ask_sync("How few units can I take?", "s20")
+    assert [r.dept for r in plain.depts] == ["iso"] and not plain.transcript      # no deliberation: registrar out of scope
+    adv = Advocate(store=store, depts={"iso": scripted_dept("iso", store, [position(12, "Stay at 12 [F-01].", refers=["registrar", "finaid"])])[0], "registrar": reg})
+    v = adv.ask_sync("How few units can I take?", "s21", deliberate=True)
+    # finaid is not an office this student's permissions table knows (nor one this advocate runs): ignored
+    assert [r.dept for r in v.depts] == ["iso", "registrar"] and v.kind == "CONVERGED"
+    assert [(t["dept"], t["round"], t["kind"]) for t in v.transcript] == [("iso", 1, "position"), ("registrar", 2, "referral")]
+    assert v.transcript[1]["invited_by"] == ["iso"] and v.brief["deliberation"] == ["REGISTRAR joined at ISO's request"]
+    prompt = reg_brain.calls[0]["user"]
+    assert "other offices' positions" in prompt and "ISO (federal): 12 units [F-01]" in prompt and "reconsider" not in prompt
+    assert "Riya" not in prompt and "Asha" not in prompt
+    assert any("DELIBERATION" in l and "registrar:referral" in l for l in store.load("student").section(4).lines)
+
+
+def test_reconsider_round_converges_or_keeps_the_dispute(store):
+    store.write("registrar", store.load("iso").text)
+    # round 1: ISO 12 vs REGISTRAR 6 at equal (department) authority; round 3: the registrar revises to 12
+    def pair():
+        iso, _ = scripted_dept("iso", store, [position(12, "Twelve [F-07].", cites=("F-07",)), position(12, "Holding: twelve [F-07].", cites=("F-07",), stance="hold")])
+        reg, reg_brain = scripted_dept("registrar", store, [position(6, "Six [F-07].", cites=("F-07",)), position(12, "Agreed, twelve [F-07].", cites=("F-07",), stance="revise")])
+        return Advocate(store=store, depts={"iso": iso, "registrar": reg}), reg_brain
+    adv, _ = pair()
+    assert adv.ask_sync("How few units can I take?", "s22").kind == "DISPUTED"          # without deliberation
+    adv, reg_brain = pair()
+    turns = []
+    v = asyncio.run(adv.ask("How few units can I take?", "s23", deliberate=True, on_turn=turns.append))
+    assert v.kind == "CONVERGED" and v.best["units"] == 12
+    assert [(t["dept"], t["round"], t["kind"], t.get("stance")) for t in v.transcript] == [
+        ("iso", 1, "position", None), ("registrar", 1, "position", None), ("iso", 3, "reconsider", "hold"), ("registrar", 3, "reconsider", "revise")]
+    assert turns == v.transcript and v.brief["deliberation"] == ["ISO hold", "REGISTRAR revise"]
+    reconsider_prompt = reg_brain.calls[1]["user"]
+    assert "reconsider:" in reconsider_prompt and "ISO (department): 12 units [F-07]" in reconsider_prompt
+    # both hold: the dispute is kept, with the stances recorded
+    iso, _ = scripted_dept("iso", store, [position(12, "Twelve [F-07].", cites=("F-07",)), position(12, "Twelve [F-07].", cites=("F-07",), stance="hold")])
+    reg, _ = scripted_dept("registrar", store, [position(6, "Six [F-07].", cites=("F-07",)), position(6, "Six [F-07].", cites=("F-07",), stance="hold")])
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s24", deliberate=True)
+    assert v.kind == "DISPUTED" and v.brief["deliberation"] == ["ISO hold", "REGISTRAR hold"] and v.brief["decides"] == ["ISO", "REGISTRAR"]
+
+
+def test_outranked_office_gets_a_reconsider_turn_too(store):
+    store.write("registrar", store.load("iso").text)
+    # ISO (federal) outranks the registrar (department) in round 1; in round 3 the registrar agrees
+    iso, _ = scripted_dept("iso", store, [position(12, "Twelve [F-01].", cites=("F-01",)), position(12, "Twelve [F-01].", cites=("F-01",), stance="hold")])
+    reg, _ = scripted_dept("registrar", store, [position(6, "Six [F-07].", cites=("F-07",)), position(12, "Agreed, twelve [F-01].", cites=("F-01",), stance="agree")])
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s25", deliberate=True)
+    assert v.kind == "CONVERGED" and v.best["units"] == 12 and "precedence" not in v.brief   # they now agree outright
+    assert [(t["dept"], t["round"], t.get("stance")) for t in v.transcript][2:] == [("iso", 3, "hold"), ("registrar", 3, "agree")]
+    assert v.brief["deliberation"] == ["ISO hold", "REGISTRAR agree"]

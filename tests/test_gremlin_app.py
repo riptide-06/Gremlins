@@ -151,3 +151,28 @@ async def test_mcp_with_a_campus_cubbies_bearer(campus):
             r = await http.post("/mcp", json=call, headers={**MCP_HEADERS, "Authorization": "Bearer " + fake.token})
             assert r.status_code == 200 and "Asha Rao" in r.json()["result"]["content"][0]["text"]
             assert "hello" in fake.calls and "read_file" in fake.calls
+
+
+async def test_demo_word_streams_the_offices_turns(campus):
+    app, fake, tmp_path = campus
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+        await http.get("/demo?token=judge-token-123")
+        # the word demo turns deliberation on and is dropped from the question
+        v = (await http.post("/api/ask", json={"question": "demo: can I drop to 12 units?"}, headers=API)).json()
+        assert v["deliberated"] is True and v["question"] == "can I drop to 12 units?"
+        assert [t["kind"] for t in v["transcript"]] and all(t["round"] == 1 for t in v["transcript"])
+        # the same over server-sent events: turns as they happen, then the verdict
+        async with http.stream("POST", "/api/ask_stream", json={"question": "Can I drop to 12 units?"}, headers=API) as r:
+            assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+            body = (await r.aread()).decode()
+        events = [blk.split("\n", 1) for blk in body.strip().split("\n\n")]
+        kinds = [e[0].removeprefix("event: ") for e in events]
+        assert kinds[0] == "open" and kinds[-1] == "verdict" and "turn" in kinds
+        verdict = json.loads(events[-1][1].removeprefix("data: "))
+        assert verdict["deliberated"] is True and verdict["verdict"] in ("CONVERGED", "DISPUTED", "ESCALATED", "ASK_STUDENT", "UNANSWERED")
+        turn = json.loads(next(e for e in events if e[0] == "event: turn")[1].removeprefix("data: "))
+        assert {"dept", "round", "kind", "position", "cites", "authority", "text"} <= set(turn)
+        assert (await http.post("/api/ask_stream", json={"question": ""}, headers=API)).status_code == 400
+    # nobody signed in: denied
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+        assert (await http.post("/api/ask_stream", json={"question": "x"}, headers=API)).status_code == 401

@@ -57,6 +57,8 @@ class DeptResult:
     ask: list[str] = field(default_factory=list)       # fields the student must approve or supply
     blocked: list[str] = field(default_factory=list)   # needs the permissions forbid (no/never)
     pending: list[tuple[int, str]] = field(default_factory=list)   # SHARED lines, written with the verdict in one edit
+    invited_by: list[str] = field(default_factory=list)            # departments whose referral pulled this one in
+    stance: str = ""                                               # hold | revise | agree after a reconsider round
 
     @property
     def shared(self) -> list[str]:
@@ -81,6 +83,8 @@ class Verdict:
     depts: list[DeptResult] = field(default_factory=list)
     brief: dict = field(default_factory=dict)
     written: list[tuple[int, str]] = field(default_factory=list)
+    transcript: list[dict] = field(default_factory=list)   # every department turn, in order (deliberation mode)
+    deliberated: bool = False
 
     @property
     def shared(self) -> dict[str, list[str]]:
@@ -97,6 +101,7 @@ class Verdict:
                 "ask_by_dept": {d.dept: d.ask for d in self.depts if d.ask},
                 "shared": self.shared, "dropped": self.dropped, "brief": self.brief,
                 "failed": [d.dept for d in self.depts if d.answer.get("failed")],
+                "deliberated": self.deliberated, "transcript": self.transcript,
                 "written": [{"section": s, "line": l} for s, l in self.written]}
 
 
@@ -184,7 +189,11 @@ class Advocate:
 
     # -- one department, up to two rounds ---------------------------------------
     async def consult(self, dept: str, student: Box, question: str, session_id: str,
-                      declined: set[str] | None = None) -> DeptResult:
+                      declined: set[str] | None = None, peers: list[dict] | None = None,
+                      reconsider: bool = False) -> DeptResult:
+        """One department, through the wall. `peers` are other offices' cited positions (a
+        referral or a reconsider round): they ride in the context as `other_offices`, policy
+        text only, never another office's student fields."""
         result = DeptResult(dept=dept)
         dept_box = self.dept_box(dept)
         approvals = approved_fields(student, dept)
@@ -192,6 +201,10 @@ class Advocate:
         declined = set(declined or ())
         for round_no in (1, 2):
             out = outbound(student, dept, question, approvals, fields=fields, declined=declined)
+            if peers:
+                out.context["other_offices"] = [dict(p) for p in peers]
+                if reconsider:
+                    out.context["reconsider"] = True
             result.rounds.append(out)
             if (line := shared_line(out, session_id)):
                 result.pending.append((SHARED_SECTION, line))
@@ -221,18 +234,99 @@ class Advocate:
         return result
 
     # -- the whole question --------------------------------------------------------
-    async def ask(self, question: str, session_id: str | None = None, declined: set[str] | None = None) -> Verdict:
+    async def ask(self, question: str, session_id: str | None = None, declined: set[str] | None = None,
+                  deliberate: bool = False, on_turn=None) -> Verdict:
+        """Round 1: every department in scope at once, none sees another (no central decision-maker).
+        With `deliberate`: a department that says another office must weigh in (`refers`) pulls it
+        into round 2 with the referring office's cited position; and when two offices still differ
+        at equal authority, round 3 gives each the other's position once and asks whether its own
+        box changes its recommendation. Agreement after that is CONVERGED with the exchange
+        recorded; disagreement stays DISPUTED, kept rather than averaged. `on_turn(turn)` is
+        called as each department speaks."""
         session_id = session_id or uuid.uuid4().hex[:12]
         student = self.store.load(self.student_box)  # fresh: a flipped field changes the verdict
         depts = self.in_scope(student, question)
-        # every department is consulted at once; none sees another's answer (no central decision-maker)
+        transcript: list[dict] = []
+
+        def say(r: DeptResult, round_no: int, kind: str, **extra) -> None:
+            turn = {"round": round_no, "kind": kind, **self._position_of(r.dept, r.answer), **extra}
+            transcript.append(turn)
+            if on_turn is not None:
+                on_turn(turn)
+
         results = list(await asyncio.gather(*[self.consult(d, student, question, session_id, declined) for d in depts]))
+        if deliberate:
+            for r in results:
+                say(r, 1, "position", refers=list(r.answer.get("refers") or []))
+            # round 2: referrals. An office named by another office's box joins, with that position in view.
+            known = {d.lower() for d in student.departments} or set(self.depts)
+            consulted = {r.dept for r in results}
+            invited: dict[str, list[str]] = {}
+            for r in results:
+                for d in r.answer.get("refers") or []:
+                    if d in self.depts and d in known and d not in consulted:
+                        invited.setdefault(d, []).append(r.dept)
+            if invited:
+                joined = list(await asyncio.gather(*[
+                    self.consult(d, student, question, session_id, declined,
+                                 peers=[self._position_of(b, next(x for x in results if x.dept == b).answer) for b in by])
+                    for d, by in invited.items()]))
+                for r, (d, by) in zip(joined, invited.items()):
+                    r.invited_by = by
+                    say(r, 2, "referral", invited_by=by)
+                results += joined
+            # round 3: reconsider. The offices whose positions differ (a dispute at equal authority,
+            # or one outranked by another) hear each other's cited position once. Offices that
+            # already agree are left alone.
+            agreed, disputed, decides, precedence, outranked = self._positions(student, [x for x in results if x.answer.get("answer") or x.answer.get("options")])
+            contested = {x.lower() for x in decides} | set(outranked)
+            for line in precedence:                      # "X wins by authority_order (...) over Y (...)"
+                contested.add(line.split(" wins by", 1)[0].strip().lower())
+            parties = [r.dept for r in results if r.dept in contested and r.dept in self.depts]
+            if len(parties) >= 2:
+                before = {r.dept: r for r in results}
+                revised = list(await asyncio.gather(*[
+                    self.consult(d, student, question, session_id, declined, reconsider=True,
+                                 peers=[self._position_of(o, before[o].answer) for o in parties if o != d])
+                    for d in parties]))
+                for r in revised:
+                    old = before[r.dept]
+                    r.invited_by = old.invited_by
+                    if r.answer.get("answer") or r.answer.get("options"):    # a failed reconsider keeps the first answer
+                        r.stance = r.answer.get("stance") or ("hold" if self._same_position(old.answer, r.answer) else "revise")
+                        results[results.index(old)] = r
+                    else:
+                        r = old
+                        r.stance = "hold"
+                    say(r, 3, "reconsider", stance=r.stance)
         verdict = self.decide(student, question, session_id, results)
+        verdict.transcript, verdict.deliberated = transcript, deliberate
+        if deliberate:
+            stances = [f"{r.dept.upper()} {r.stance}" for r in results if r.stance]
+            joined_names = [f"{r.dept.upper()} joined at {','.join(b.upper() for b in r.invited_by)}'s request" for r in results if r.invited_by]
+            verdict.brief["deliberation"] = joined_names + stances
         self.write(verdict)
         return verdict
 
-    def ask_sync(self, question: str, session_id: str | None = None, declined: set[str] | None = None) -> Verdict:
-        return asyncio.run(self.ask(question, session_id, declined))
+    def ask_sync(self, question: str, session_id: str | None = None, declined: set[str] | None = None,
+                 deliberate: bool = False) -> Verdict:
+        return asyncio.run(self.ask(question, session_id, declined, deliberate=deliberate))
+
+    def _position_of(self, dept: str, answer: dict) -> dict:
+        """What one office says, as the other offices may see it: its recommended option, the
+        cites behind it, its authority level, and the cited answer text. No student fields."""
+        opts = answer.get("options") or []
+        first = opts[0] if opts else {}
+        return {"dept": dept, "position": str(first.get("option", "") or "")[:300],
+                "units": first.get("units"), "hours": first.get("hours"),
+                "cites": list(first.get("cites") or answer.get("cites") or [])[:8],
+                "authority": self.position_authority(dept, first) if first else answer.get("authority", ""),
+                "text": str(answer.get("answer", ""))[:600], "failed": bool(answer.get("failed"))}
+
+    @staticmethod
+    def _same_position(a: dict, b: dict) -> bool:
+        fa, fb = (a.get("options") or [{}])[0], (b.get("options") or [{}])[0]
+        return fa.get("units") == fb.get("units") and fa.get("option", "").strip().lower() == fb.get("option", "").strip().lower()
 
     # -- deciding -------------------------------------------------------------------
     def decide(self, student: Box, question: str, session_id: str, results: list[DeptResult]) -> Verdict:
@@ -361,6 +455,10 @@ class Advocate:
             v.written.append((SECTION_OPEN, log_line("ASK_STUDENT", v.session_id, q, ",".join(v.ask), depts)))
         v.written.append((SECTION_LOG, log_line("SESSION", v.session_id, v.kind, ",".join(r.dept for r in v.depts) or "-",
                                                 ",".join(v.cites) or "-", f"dropped={v.dropped}")))
+        if v.deliberated:
+            v.written.append((SECTION_LOG, log_line("DELIBERATION", v.session_id,
+                                                    ",".join(f"{t['dept']}:{t['kind']}" + (f"={t['stance']}" if t.get("stance") else "") for t in v.transcript) or "-",
+                                                    "; ".join(v.brief.get("deliberation", [])) or "-")))
         shared = [item for r in v.depts for item in r.pending]
         append_many(self.store, self.student_box, shared + v.written)
 

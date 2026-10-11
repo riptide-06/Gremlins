@@ -117,6 +117,15 @@ th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 /* additions for the live app */
 .hiddenx{display:none !important}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+.room{display:flex;flex-direction:column;gap:10px}
+.turn{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);font-size:13px;animation:turnin .35s ease-out}
+.turn .who{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:112px}
+.turn .lbl{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.turn.r2{border-style:dashed}
+.turn.r3{border-color:var(--orange)}
+.stance{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:6px;border:1.5px solid var(--line);text-transform:uppercase}
+.stance.hold{background:var(--warn-bg)} .stance.revise,.stance.agree{background:var(--green)}
+@keyframes turnin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @keyframes spin{to{transform:rotate(360deg)}}
 .code-big{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:.18em;padding:10px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);display:inline-block}
 .v-un{background:#DDD}
@@ -278,6 +287,7 @@ claude mcp add gremlin -- uv run --directory $PWD mcp_server.py</pre></div>
             <a class="card lift q-card" data-q="My college adviser approved me to take 10 units this quarter, so I can drop to 10, right?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">WHO DECIDES</span><span style="font-weight:600;font-size:14px">My college adviser approved 10 units, so I can drop to 10, right?</span></a>
             <a class="card lift q-card" data-q="Can I take a second on-campus job, 12 more hours a week?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">WORK HOURS</span><span style="font-weight:600;font-size:14px">Can I take a second on-campus job, 12 more hours a week?</span></a>
             <a class="card lift q-card" data-q="Should I add CMPM 120 now and go to 22 units, or wait until next year?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">TWO ADVISERS</span><span style="font-weight:600;font-size:14px">Should I add CMPM 120 now and go to 22 units, or wait?</span></a>
+            <a class="card lift q-card" data-q="demo: Should I add CMPM 120 now and go to 22 units, or wait until next year?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--orange);border-color:var(--orange)"><span class="eyebrow">WATCH THEM TALK · type "demo:" before any question</span><span style="font-weight:600;font-size:14px">demo: Should I add CMPM 120 now and go to 22 units, or wait?</span></a>
           </div>
         </div>
       </div>
@@ -679,6 +689,7 @@ SendMessage {"session_id","question","context"}</pre>
       if (v.verdict === 'DISPUTED') html += '<div class="why"><strong style="font-size:12px">Why this is disputed, not averaged</strong><span>Both positions rest on rules of the same rank, so no precedence applies. Both are kept in your cubby. ' + (b.decides && b.decides.length ? 'Who decides: you, with ' + esc(b.decides.join(' and ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'ESCALATED') html += '<div class="why"><strong style="font-size:12px">Why a person has to look at this</strong><span>' + esc((b.resolve || []).join(' ') || 'A trigger in the policy box matched your situation.') + (b.decides && b.decides.length ? ' Decides: ' + esc(b.decides.join(', ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'CONVERGED' && b.precedence && b.precedence.length) html += '<div class="why"><strong style="font-size:12px">Precedence applied</strong><span>' + esc(b.precedence.join('; ')) + (b.agreed && b.agreed.length ? ' ' + esc(b.agreed.join('; ')) : '') + '</span></div>';
+      if (v.deliberated) html += '<div class="why" style="border-left-color:var(--blue)"><strong style="font-size:12px">How the offices got here</strong><span>' + ((b.deliberation && b.deliberation.length) ? esc(b.deliberation.join(' · ')) + '. ' : 'No office named another, and nobody disagreed at equal authority, so there was nothing to argue about. ') + 'Only cited policy crossed between offices; your fields went to each one by your own rules.</span></div>';
       if (v.options && v.options.length) html += '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px"><strong style="font-size:12px">Your options, ranked by your preferences</strong>' + v.options.map(function(o){ var attrs = ['units','hours','weeks'].filter(function(k){ return o[k] != null; }).map(function(k){ return k + ' ' + o[k]; }).join(', '); return '<span>' + o.rank + '. ' + esc(o.option) + ' <span class="chip">' + esc(shortDept(o.dept)) + '</span> ' + cites(o.cites) + (attrs ? ' <span class="muted">(' + esc(attrs) + ')</span>' : '') + (o.conditions && o.conditions.length ? '<div class="muted" style="font-size:12px">if: ' + esc(o.conditions.join('; ')) + '</div>' : '') + '</span>'; }).join('') + '</div>';
       if (v.escalations && v.escalations.length) html += '<span class="receipt">triggers fired in code: ' + cites((b.triggers && b.triggers.length) ? b.triggers.map(function(t){ return t.split(':')[0]; }) : v.escalations) + '</span>';
     }
@@ -691,27 +702,76 @@ SendMessage {"session_id","question","context"}</pre>
   }
   function addBubble(cls, text){ var el = document.createElement('div'); el.className = 'me'; if (cls) el.style.background = cls; el.textContent = text; $('thread').appendChild(el); return el; }
   function addReply(html){ var g = document.createElement('div'); g.className = 'grem'; g.innerHTML = '<span class="av logo-slot"></span><div class="reply">' + html + '</div>'; g.querySelector('.logo-slot').appendChild(lt.cloneNode(true)); $('thread').appendChild(g); window.scrollTo(0, document.body.scrollHeight); return g; }
+  var DEMO_WORD = /^\s*demo\b/i;   // "demo: ..." makes the offices deliberate in the open, streamed turn by turn
+  function settle(v, question){
+    if (v.error) { addReply('<div class="row"><span class="verdict v-esc">ERROR</span></div><p>' + esc(v.error) + '</p>'); return; }
+    var g = addReply(renderReply(v, question));
+    if (v.verdict === 'ESCALATED' || v.verdict === 'DISPUTED') state.lastBrief = {v: v, q: question};
+    g.querySelectorAll('.act-approve').forEach(function(b){ b.onclick = function(){ api('/api/approve', {field: b.dataset.f, dept: b.dataset.d}).then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + b.dataset.f + ' with ' + shortDept(b.dataset.d) + ' for this question.'}); }); }; });
+    g.querySelectorAll('.act-approve-all').forEach(function(b){ b.onclick = function(){
+      var pairs = b.dataset.all.split(',').map(function(p){ var x = p.split(':'); return {field: x[0], dept: x[1]}; });
+      var chain = Promise.resolve();
+      pairs.forEach(function(pr){ chain = chain.then(function(){ return api('/api/approve', pr); }); });
+      chain.then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + pairs.map(function(pr){ return pr.field + ' with ' + shortDept(pr.dept); }).join(', ') + ' for this question.'}); });
+    }; });
+    g.querySelectorAll('.act-decline').forEach(function(b){ b.onclick = function(){ ask(question, b.dataset.fields.split(','), {color: 'var(--card)', text: 'No, answer without it.'}); }; });
+    loadBox();
+  }
+  function turnLabel(t){
+    if (t.kind === 'referral') return 'joins · round 2 · asked in by ' + (t.invited_by || []).map(shortDept).join(', ');
+    if (t.kind === 'reconsider') return 'reconsiders · round 3';
+    return 'position · round 1';
+  }
+  function renderTurn(t){
+    var html = '<div class="who"><span class="chip">' + esc(shortDept(t.dept)) + ' gremlin</span><span class="lbl">' + esc(turnLabel(t)) + '</span>' + (t.stance ? '<span class="stance ' + esc(t.stance) + '">' + esc(t.stance) + '</span>' : '') + (t.authority ? '<span class="lbl">' + esc(t.authority) + ' authority</span>' : '') + '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:4px"><span>' + (t.failed ? '<span class="err">did not answer (model failure)</span>' : (t.text ? withCites(t.text) : '<span class="muted">no answer text</span>')) + '</span>';
+    if (t.position) html += '<span style="font-size:12.5px"><strong>Position:</strong> ' + esc(t.position) + (t.units != null ? ' <span class="muted">(units ' + esc(t.units) + ')</span>' : '') + ' ' + cites(t.cites) + '</span>';
+    if (t.refers && t.refers.length) html += '<span class="muted" style="font-size:12px">asks ' + esc(t.refers.map(shortDept).join(', ')) + ' to weigh in</span>';
+    html += '</div>';
+    var el = document.createElement('div'); el.className = 'turn r' + (t.round || 1); el.innerHTML = html; return el;
+  }
+  function askStream(question, declined, note){
+    var g = addReply('<div class="row"><span class="verdict v-un">THE OFFICES TALK</span><span class="muted" style="font-size:12px">live · each office answers from its own box · they only ever see each other\'s cited positions</span></div><div class="room" id="room-live"></div><div class="row" id="room-wait"><span class="spin"></span><span class="muted" style="font-size:12px">round 1: everyone in scope answers at once</span></div>');
+    var room = g.querySelector('#room-live'), wait = g.querySelector('#room-wait'); room.id = ''; wait.id = '';
+    var got = {verdict: null, error: null};
+    var onEvent = function(kind, data){
+      if (kind === 'turn') { room.appendChild(renderTurn(data)); wait.querySelector('.muted').textContent = data.round === 1 ? 'listening for referrals, then a reconsider round if two offices disagree at equal authority' : (data.round === 2 ? 'an office joined; checking whether anyone disagrees at equal authority' : 'reconsider round in progress'); window.scrollTo(0, document.body.scrollHeight); }
+      else if (kind === 'verdict') got.verdict = data;
+      else if (kind === 'error') got.error = data;
+    };
+    return fetch('/api/ask_stream', {method: 'POST', headers: {'X-Gremlin': '1', 'Content-Type': 'application/json'}, credentials: 'same-origin', body: JSON.stringify({question: question, declined: declined || []})}).then(function(r){
+      if (!r.ok || !r.body) return r.json().then(function(j){ got.error = j; });
+      var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
+      var pump = function(){ return reader.read().then(function(x){
+        if (x.done) return;
+        buf += dec.decode(x.value, {stream: true});
+        var parts = buf.split('\n\n'); buf = parts.pop();
+        parts.forEach(function(blk){ var ev = '', data = ''; blk.split('\n').forEach(function(l){ if (l.indexOf('event: ') === 0) ev = l.slice(7); else if (l.indexOf('data: ') === 0) data += l.slice(6); }); if (ev && data) { try { onEvent(ev, JSON.parse(data)); } catch (e) {} } });
+        return pump();
+      }); };
+      return pump();
+    }).then(function(){
+      wait.remove();
+      if (!room.children.length) room.remove();
+      if (got.error) { if (got.error.reconnect) reconnect(got.error.error); settle({error: got.error.error || 'The stream ended without a verdict.'}, question); }
+      else settle(got.verdict || {error: 'The stream ended without a verdict.'}, question);
+    });
+  }
   function ask(question, declined, note){
     if (state.busy || !question) return;
     state.busy = true; $('send').disabled = true;
     location.hash = '#chat'; $('v-empty').hidden = true; $('v-thread').hidden = false;
     if (note) addBubble(note.color, note.text); else { addBubble(null, question); state.thread.push(question); paintRecent(); }
+    var done = function(){ state.busy = false; $('send').disabled = false; };
+    if (DEMO_WORD.test(question)) {
+      askStream(question, declined, note).catch(function(){ addReply('<p class="err">This server did not answer. Try again.</p>'); }).then(done);
+      return;
+    }
     var pending = addReply('<div class="row"><span class="spin"></span><span class="muted" style="font-size:12px">asking the departments through the wall</span></div>');
     api('/api/ask', {question: question, declined: declined || []}).then(function(v){
       pending.remove();
-      if (v.error) { addReply('<div class="row"><span class="verdict v-esc">ERROR</span></div><p>' + esc(v.error) + '</p>'); return; }
-      var g = addReply(renderReply(v, question));
-      if (v.verdict === 'ESCALATED' || v.verdict === 'DISPUTED') state.lastBrief = {v: v, q: question};
-      g.querySelectorAll('.act-approve').forEach(function(b){ b.onclick = function(){ api('/api/approve', {field: b.dataset.f, dept: b.dataset.d}).then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + b.dataset.f + ' with ' + shortDept(b.dataset.d) + ' for this question.'}); }); }; });
-      g.querySelectorAll('.act-approve-all').forEach(function(b){ b.onclick = function(){
-        var pairs = b.dataset.all.split(',').map(function(p){ var x = p.split(':'); return {field: x[0], dept: x[1]}; });
-        var chain = Promise.resolve();
-        pairs.forEach(function(pr){ chain = chain.then(function(){ return api('/api/approve', pr); }); });
-        chain.then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + pairs.map(function(pr){ return pr.field + ' with ' + shortDept(pr.dept); }).join(', ') + ' for this question.'}); });
-      }; });
-      g.querySelectorAll('.act-decline').forEach(function(b){ b.onclick = function(){ ask(question, b.dataset.fields.split(','), {color: 'var(--card)', text: 'No, answer without it.'}); }; });
-      loadBox();
-    }).catch(function(){ pending.remove(); addReply('<p class="err">This server did not answer. Try again.</p>'); }).then(function(){ state.busy = false; $('send').disabled = false; });
+      settle(v, question);
+    }).catch(function(){ pending.remove(); addReply('<p class="err">This server did not answer. Try again.</p>'); }).then(done);
   }
   function paintRecent(){
     var el = $('recent'); el.innerHTML = '<span class="eyebrow" style="padding:0 6px">RECENT</span>';
@@ -735,6 +795,7 @@ SendMessage {"session_id","question","context"}</pre>
       + block('AGREED', esc((b.agreed || []).join(' · ')), '#2E9E4F')
       + block('DISPUTED', esc((b.disputed || []).join(' · ')), 'var(--orange)')
       + block('PRECEDENCE', esc((b.precedence || []).join('; ')))
+      + block('DELIBERATION', esc((b.deliberation || []).join(' · ')))
       + block('OPTIONS', (b.options || []).map(function(o, i){ return String.fromCharCode(97 + i) + '. ' + esc(o); }).join('<br>'))
       + block('WHAT WOULD RESOLVE IT', esc((b.resolve || []).join(' · ')))
       + block('TRIGGERS', cites((b.triggers && b.triggers.length) ? b.triggers.map(function(t){ return t.split(':')[0]; }) : v.escalations))

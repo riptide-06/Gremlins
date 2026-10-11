@@ -33,7 +33,7 @@ import httpx
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.routing import Route
 
 from advocate import DEPARTMENTS, Advocate, build_depts, dept_urls_from_env
@@ -48,6 +48,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 DEMO_UID = "demo"
 _FIELD = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+DEMO_WORD = re.compile(r"^\s*demo\b[\s:,.-]*", re.IGNORECASE)   # "demo: ..." asks the offices to deliberate in the open
 SITE = Path(__file__).with_name("site.html")
 CSP = ("default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
        "script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -304,21 +305,75 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
             return JSONResponse({"error": "Campus Cubbies no longer accepts this connection. Connect again.", "reconnect": True}, status_code=401)
         return JSONResponse({"error": f"Your cubby did not answer: {str(exc)[:160]}"}, status_code=503)
 
+    def parse_ask(body: dict) -> tuple[str, set[str], bool]:
+        """The question, the declined ask-fields, and whether the offices should deliberate. The word
+        "demo" at the start of a question (\"demo: can I ...\") turns deliberation on and is dropped."""
+        question = str(body.get("question", "")).strip()[:4000]
+        deliberate = bool(body.get("deliberate"))
+        m = DEMO_WORD.match(question)
+        if m:
+            question, deliberate = question[m.end():].strip(), True
+        declined = {str(f) for f in (body.get("declined") or []) if _FIELD.match(str(f))}
+        return question, declined, deliberate
+
     async def api_ask(request):
         caller = await api_caller(request)
         if not caller:
             return denied()
-        body = await body_of(request)
-        question = str(body.get("question", "")).strip()[:4000]
+        question, declined, deliberate = parse_ask(await body_of(request))
         if not question:
             return JSONResponse({"error": "question is required"}, status_code=400)
-        declined = {str(f) for f in (body.get("declined") or []) if _FIELD.match(str(f))}
-        emit("api_ask", demo=caller[0] == DEMO_UID)
+        emit("api_ask", demo=caller[0] == DEMO_UID, deliberate=deliberate)
         try:
-            verdict = await advocate_for(*caller).ask(question, declined=declined or None)
+            verdict = await advocate_for(*caller).ask(question, declined=declined or None, deliberate=deliberate)
         except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
             return cubby_failure(exc, request)
         return JSONResponse(verdict.to_dict())
+
+    async def api_ask_stream(request):
+        """The same question, with the offices' turns streamed as server-sent events while they
+        happen: `turn` per department position, referral, or reconsideration, then `verdict`."""
+        caller = await api_caller(request)
+        if not caller:
+            return denied()
+        question, declined, _ = parse_ask(await body_of(request))
+        if not question:
+            return JSONResponse({"error": "question is required"}, status_code=400)
+        emit("api_ask_stream", demo=caller[0] == DEMO_UID)
+        queue: asyncio.Queue = asyncio.Queue()
+        adv = advocate_for(*caller)
+
+        async def run():
+            try:
+                v = await adv.ask(question, declined=declined or None, deliberate=True, on_turn=lambda t: queue.put_nowait(("turn", t)))
+                queue.put_nowait(("verdict", v.to_dict()))
+            except CubbyAuthError:
+                queue.put_nowait(("error", {"error": "Campus Cubbies no longer accepts this connection. Connect again.", "reconnect": True}))
+            except (CubbyError, FileNotFoundError, httpx.HTTPError) as exc:
+                emit("cubby_error", reason=type(exc).__name__)
+                queue.put_nowait(("error", {"error": f"Your cubby did not answer: {str(exc)[:160]}"}))
+            except Exception as exc:  # noqa: BLE001 - the stream must always end
+                emit("ask_stream_failed", reason=type(exc).__name__)
+                queue.put_nowait(("error", {"error": "The gremlin hit an unexpected error."}))
+            finally:
+                queue.put_nowait(None)
+
+        task = asyncio.create_task(run())
+
+        async def events():
+            yield "event: open\ndata: {}\n\n"
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    kind, data = item
+                    yield f"event: {kind}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+            finally:
+                if not task.done():
+                    task.cancel()
+        return StreamingResponse(events(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
     async def api_approve(request):
         caller = await api_caller(request)
@@ -456,7 +511,8 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
     app = Starlette(routes=[Route("/", site), Route("/chat", chat_redirect), Route("/demo", demo), Route("/health", health), Route("/healthz", health),
                             Route("/api/connect/start", connect_start, methods=["POST"]), Route("/api/connect/poll", connect_poll, methods=["POST"]),
                             Route("/api/me", me), Route("/api/logout", logout, methods=["POST"]),
-                            Route("/api/ask", api_ask, methods=["POST"]), Route("/api/approve", api_approve, methods=["POST"]),
+                            Route("/api/ask", api_ask, methods=["POST"]), Route("/api/ask_stream", api_ask_stream, methods=["POST"]),
+                            Route("/api/approve", api_approve, methods=["POST"]),
                             Route("/api/set", api_set, methods=["POST"]), Route("/api/permission", api_permission, methods=["POST"]),
                             Route("/api/box", api_box), Route("/api/open_items", api_open_items), Route("/api/reset", api_reset, methods=["POST"]),
                             *mcp_routes],

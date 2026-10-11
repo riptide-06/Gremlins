@@ -36,6 +36,17 @@ student Asha Rao (F-1, 17 units, 10 on-campus hours, CS: Computer Game Design, C
 the question cards, approve a field when asked, change `days_to_deadline` to 2 on *My Cubby*
 and ask the first question again. *Reset the demo student* puts everything back.
 
+**Watch the offices talk:** start any question with the word `demo:` and the departments
+deliberate in the open, streamed turn by turn. Round 1: every office in scope answers at once,
+none sees another. Round 2: an office whose box says another office must weigh in (`refers`,
+for example a P-xx line naming financial aid) pulls it in, with its own cited position in view.
+Round 3: offices whose positions differ hear each other's cited position once and say whether
+their box makes them hold, revise, or agree. Agreement after that is CONVERGED with the exchange
+recorded; disagreement at equal authority stays DISPUTED, kept rather than averaged. Only cited
+policy ever crosses between offices; the student's fields go to each office by the student's own
+rules, and no office sees what another office received. Same thing over MCP: `ask(question,
+deliberate=true)`, transcript included.
+
 **Your own agent (MCP):** pair any agent with Campus Cubbies ([its guide](prototypes/cubbies/SKILL.md)),
 then add `https://<service>/mcp` with `Authorization: Bearer <that token>`. Tools: `ask`,
 `my_box`, `approve_share`, `open_items`. Same cubby, same wall.
@@ -102,7 +113,7 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 | criterion | where it is |
 |---|---|
 | three or more autonomous agents with competing objectives | ISO (status), CMPM advising (degree plan), college advising (load and standing), financial aid (money); each answers only from its own box and its own authority level |
-| deliberate, negotiate, reach consensus without a central decision-maker | the advocate never answers from its own knowledge; departments are consulted in parallel and never see each other; agreement, precedence, and dispute are computed from their positions (`advocate.py: _positions`) |
+| deliberate, negotiate, reach consensus without a central decision-maker | the advocate never answers from its own knowledge; departments are consulted in parallel and never see each other; agreement, precedence, and dispute are computed from their positions (`advocate.py: _positions`). With `demo:` (deliberation mode) the offices negotiate directly: a referral round pulls in an office another office's box names, and a reconsider round lets offices whose positions differ hear each other's cited position once and hold, revise, or agree; the exchange is streamed to the student and logged to the cubby (`DELIBERATION` line) |
 | genuine disagreement and a real mechanism | `p1`: college approves 10 units, ISO says status terminates: federal outranks campus, CONVERGED with the override recorded. `d1`: CMPM recommends adding CMPM 120 now (offered once a year), college practice says stay at or below 19 credits while working 10 hours: both rest on department practice, DISPUTED, both positions kept, the student decides. Each office's position is the option it recommends, and its authority is the level of the rule that option rests on (`basis`), read from the box, so a permission quoted in passing cannot win an argument |
 | the effect of new information | `a1`/`d1`: approving `hours` turns ASK_STUDENT into an answer or a dispute; `e2`: the same question as `c1` with `days_to_deadline` moved to 2 becomes ESCALATED |
 | comparison against a simpler baseline | `eval.py`: one LLM call given every box and the whole student box, scored by the same wall. Ten cases, live models: gremlins 9/10 correct verdicts, 0 protected fields shared; baseline 3/10, 120 protected field-sends, 33 uncited sentences shown ([docs/EVAL.md](docs/EVAL.md)) |
