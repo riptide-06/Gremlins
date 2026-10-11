@@ -31,9 +31,8 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Redire
 from starlette.routing import Route
 from mcp.server.transport_security import TransportSecuritySettings
 
-from advocate import Advocate, in_process, over_a2a
+from advocate import Advocate, build_depts, dept_urls_from_env
 from box import MarkdownBoxStore, seed_student_box
-from dept_gremlin import DeptGremlin
 from mcp_server import CURRENT_ADVOCATE, build_mcp
 
 logger = logging.getLogger("gremlin")
@@ -319,11 +318,15 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
                        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
                        client_kwargs={"scope": "openid email profile", "code_challenge_method": "S256"})
 
-    # One ISO caller for the process; the advocate itself is built per request and holds no state.
-    iso = over_a2a(settings.iso_url) if settings.iso_url else in_process(DeptGremlin("iso", store=boxes, brain=brain))
+    # One caller per department for the process (A2A when DEPT_URLS/ISO_URL name it, in-process
+    # otherwise); the advocate itself is built per request and holds no state.
+    urls = dept_urls_from_env()
+    if settings.iso_url:
+        urls["iso"] = settings.iso_url
+    depts = build_depts(boxes, brain, urls)
 
     def advocate_for(uid):
-        return Advocate(store=boxes, student_box=student_box_name(uid), depts={"iso": iso})
+        return Advocate(store=boxes, student_box=student_box_name(uid), depts=depts)
 
     def form(request, action, label):
         csrf = request.session.setdefault("csrf", secrets.token_urlsafe(32))

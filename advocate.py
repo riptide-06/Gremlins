@@ -1,6 +1,7 @@
 """The student gremlin (advocate). Reads the student box fresh, runs the wall,
-asks every in-scope department gremlin, scores options with the student's
-preferences, and writes the verdict back into the student box.
+asks every in-scope department gremlin (chosen by the `topics:` line each box
+advertises, all at once, none seeing another's answer), scores options with the
+student's preferences, and writes the verdict back into the student box.
 
 Verdicts
   CONVERGED    one answer, written to section 5
@@ -18,6 +19,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 import json
+import os
 import re
 from typing import Awaitable, Callable
 import uuid
@@ -28,6 +30,7 @@ from wall import Inbound, Outbound, approved_fields, inbound, log_shared, outbou
 
 SECTION_LOG, SECTION_CONVERGED, SECTION_BRIEFS, SECTION_OPEN = 4, 5, 6, 8
 VERDICTS = ("CONVERGED", "ESCALATED", "DISPUTED", "ASK_STUDENT", "UNANSWERED")
+DEPARTMENTS = ("iso", "cmpm", "college", "finaid")   # a box per department under docs/boxes/
 
 DeptCaller = Callable[[str, str, dict], Awaitable[dict]]
 
@@ -139,9 +142,27 @@ class Advocate:
 
     # -- scope ---------------------------------------------------------------
     def in_scope(self, student: Box, question: str) -> list[str]:
-        """Tonight: every registered department the permissions table knows. One dept, ISO."""
+        """Capability-based selection, no central router: a department is asked when the
+        question matches the `topics:` regex its own box advertises. A box with no topics
+        line is always asked. If nothing matches, everyone is asked and each gremlin
+        decides its own scope. Only departments the student's permissions table knows."""
         known = {d.lower() for d in student.departments}
-        return [d for d in self.depts if d.lower() in known] or list(self.depts)
+        candidates = [d for d in self.depts if d.lower() in known] or list(self.depts)
+        chosen = []
+        for d in candidates:
+            try:
+                topics = self.dept_box(d).meta.get("topics", "").strip()
+            except (FileNotFoundError, OSError, ValueError):
+                topics = ""
+            if not topics:
+                chosen.append(d)
+                continue
+            try:
+                if re.search(topics, question, re.IGNORECASE):
+                    chosen.append(d)
+            except re.error:
+                chosen.append(d)
+        return chosen or candidates
 
     def dept_box(self, dept: str) -> Box:
         return self.store.load(self.dept_boxes.get(dept, dept))
@@ -184,7 +205,8 @@ class Advocate:
         session_id = session_id or uuid.uuid4().hex[:12]
         student = self.store.load(self.student_box)  # fresh: a flipped field changes the verdict
         depts = self.in_scope(student, question)
-        results = [await self.consult(d, student, question, session_id) for d in depts]
+        # every department is consulted at once; none sees another's answer (no central decision-maker)
+        results = list(await asyncio.gather(*[self.consult(d, student, question, session_id) for d in depts]))
         verdict = self.decide(student, question, session_id, results)
         self.write(verdict)
         return verdict
@@ -294,11 +316,40 @@ class Advocate:
         return items
 
 
-def default_advocate(store: BoxStore | None = None, brain=None, iso_url: str | None = None) -> Advocate:
-    """ISO in-process by default; pass iso_url to reach a running dept_gremlin over A2A."""
+def dept_urls_from_env() -> dict[str, str]:
+    """DEPT_URLS="iso=http://127.0.0.1:10001,cmpm=http://127.0.0.1:10002"; ISO_URL still works."""
+    out = {}
+    for pair in (os.environ.get("DEPT_URLS") or "").split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            if k.strip() and v.strip():
+                out[k.strip().lower()] = v.strip()
+    if os.environ.get("ISO_URL"):
+        out.setdefault("iso", os.environ["ISO_URL"])
+    return out
+
+
+def build_depts(store: BoxStore, brain=None, urls: dict[str, str] | None = None,
+                names: tuple[str, ...] = DEPARTMENTS) -> dict[str, DeptCaller]:
+    """One caller per department whose box exists: over A2A when a URL is given, in-process otherwise."""
+    urls = urls or {}
+    depts: dict[str, DeptCaller] = {}
+    for d in names:
+        if d in urls:
+            depts[d] = over_a2a(urls[d])
+        elif store.exists(d):
+            depts[d] = in_process(DeptGremlin(d, store=store, brain=brain))
+    return depts
+
+
+def default_advocate(store: BoxStore | None = None, brain=None, iso_url: str | None = None,
+                     dept_urls: dict[str, str] | None = None, student_box: str = "student") -> Advocate:
+    """Every department with a box, in-process by default; URLs route a department over A2A."""
     store = store or MarkdownBoxStore()
-    iso = over_a2a(iso_url) if iso_url else in_process(DeptGremlin("iso", store=store, brain=brain))
-    return Advocate(store=store, depts={"iso": iso})
+    urls = {**dept_urls_from_env(), **(dept_urls or {})}
+    if iso_url:
+        urls["iso"] = iso_url
+    return Advocate(store=store, student_box=student_box, depts=build_depts(store, brain, urls))
 
 
 if __name__ == "__main__":

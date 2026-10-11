@@ -1,4 +1,4 @@
-"""Baseline condition: one LLM call with the question, the full ISO box, and the
+"""Baseline condition: one LLM call with the question, every department box, and the
 full student box. No wall, no code-decided escalation, no cite verification.
 Same output contract as a department gremlin so the eval can score both."""
 from __future__ import annotations
@@ -29,11 +29,29 @@ under "needs". Set "escalate" to true when a human must decide. Reply with one J
 === END STUDENT BOX ==="""
 
 
-def build_prompts(dept_box: Box, student_box: Box, question: str) -> tuple[str, str]:
+def merge_boxes(boxes: list[Box]) -> Box:
+    """The baseline gets every department box pasted into one prompt. The merged Box is
+    only used for the after-the-fact cite check; colliding ids (every box has an F-01)
+    are part of what the baseline gets wrong."""
+    if len(boxes) == 1:
+        return boxes[0]
+    merged = Box(name="all-departments")
+    merged.text = "\n\n".join(f"=== {b.meta.get('name') or b.name} ===\n{b.text}" for b in boxes)
+    for b in boxes:
+        merged.facts.update(b.facts)
+        merged.precedence.update(b.precedence)
+        merged.faq.update(b.faq)
+        merged.escalations.update(b.escalations)
+    merged.meta["authority_order"] = boxes[0].meta.get("authority_order", "")
+    return merged
+
+
+def build_prompts(dept_box: Box | list[Box], student_box: Box, question: str) -> tuple[str, str]:
+    dept_box = merge_boxes(dept_box) if isinstance(dept_box, list) else dept_box
     return SYSTEM.format(dept=dept_box.text, student=student_box.text), f"question: {question}"
 
 
-def baseline_answer(brain: Brain, dept_box: Box, student_box: Box, question: str) -> dict:
+def baseline_answer(brain: Brain, dept_box: Box | list[Box], student_box: Box, question: str) -> dict:
     system, user = build_prompts(dept_box, student_box, question)
     raw = brain.complete(system, user, BASELINE_SCHEMA)
     out = {"scope": "out_of_scope", "answer": "", "cites": [], "needs": [], "options": [],

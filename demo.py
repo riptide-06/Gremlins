@@ -1,18 +1,21 @@
-"""End-to-end demo: three questions through the advocate, the wall, and the ISO gremlin.
+"""End-to-end demo: the judge's six questions through the advocate, the wall, and
+four department gremlins (ISO, CMPM advising, college advising, financial aid).
 
-    uv run demo.py                      # fresh copy of the boxes under out/demo/, transport auto
+    uv run demo.py                      # fresh copy of the real boxes under out/demo/, transport auto
     uv run demo.py --live               # write into docs/boxes/ for real
-    uv run demo.py --transport slim     # require A2A over SLIM (node must be up)
+    uv run demo.py --transport slim     # require A2A over SLIM for ISO (node must be up)
+    uv run demo.py --questions c1,d1    # a subset, by id (see docs/QUESTIONS.md)
 
 Transport auto: if a SLIM node answers on 127.0.0.1:46357 and SLIM_SHARED_SECRET
 is set, the demo starts dept_gremlin.py on port 10001 and a gremlin_slim.py
-gateway in front of it, and every department call travels agent -> SLIM ->
-gateway -> A2A. Otherwise the ISO gremlin runs in-process.
+gateway in front of it, and every ISO call travels agent -> SLIM -> gateway ->
+A2A; the other three gremlins run in-process. Otherwise all four run in-process.
 
-Each step prints: fields shared (and withheld, held, awaiting approval), needs,
-ranked options, the verdict with its brief, and every line written to the
-student box. Question 3 is asked twice: before and after flipping final_quarter,
-to show the verdict change.
+Each step prints: departments in scope, fields shared (and withheld, held,
+awaiting approval), needs, ranked options, the verdict with its brief, and every
+line written to the student box. ASK_STUDENT questions are re-asked after the
+student approves the field; c1 is asked again after the deadline moves to 2 days
+away, to show the same question change verdict on new information.
 """
 from __future__ import annotations
 
@@ -30,7 +33,7 @@ import sys
 import time
 import urllib.request
 
-from advocate import Advocate, Verdict, in_process, over_a2a
+from advocate import Advocate, Verdict, build_depts, over_a2a
 from box import MarkdownBoxStore
 from brain import default_brain
 from dept_gremlin import DeptGremlin, empty_answer
@@ -43,10 +46,14 @@ DEPT_PORT = 10001
 GATEWAY_NAME = "ucsc/gremlins/iso"
 
 QUESTIONS = [
-    ("Q1", "I want to drop from 16 to 9 units this quarter because of my job. Can I?"),
-    ("Q2", "Am I currently over the on-campus work-hour limit?"),
-    ("Q3", "Can I enroll in just 8 units this quarter?"),
+    ("c1", "Can I drop my 5-unit GE and go from 17 to 12 units?"),
+    ("p1", "My college adviser approved me to take 10 units this quarter, so I can drop to 10, right?"),
+    ("e1", "I've been dealing with a health issue and can't handle 17 units. What can I do?"),
+    ("a1", "Can I take a second on-campus job, 12 more hours a week?"),
+    ("d1", "Should I add CMPM 120 now and go to 22 units, or wait until next year?"),
+    ("e2", "Can I drop my 5-unit GE and go from 17 to 12 units?"),   # same as c1, after days_to_deadline -> 2
 ]
+REAL = ("iso", "cmpm", "college", "finaid", "student")
 
 
 # ---- transports ---------------------------------------------------------------
@@ -143,6 +150,7 @@ def show(v: Verdict, log) -> None:
             attrs = ", ".join(f"{k}={o[k]}" for k in ("units", "hours", "weeks") if o.get(k) is not None)
             log(f"    {o['rank']}. {o['option']}  [{', '.join(o['cites'])}]" + (f"  ({attrs})" if attrs else "")
                 + (f"  if: {'; '.join(o['conditions'])}" if o.get("conditions") else ""))
+    log(f"  in scope: {[d.dept for d in v.depts]}")
     log(f"  VERDICT: {v.kind}" + (f"  authority={v.authority}" if v.authority else "") + (f"  triggers={v.escalations}" if v.escalations else "")
         + (f"  ask={v.ask}" if v.ask else ""))
     if v.answer:
@@ -154,50 +162,51 @@ def show(v: Verdict, log) -> None:
         log(f"  wrote section {section}: {line[:150]}")
 
 
-def run(store: MarkdownBoxStore, brain=None, transport: str = "auto", log=print) -> list[Verdict]:
+def run(store: MarkdownBoxStore, brain=None, transport: str = "auto", log=print,
+        questions: list[tuple[str, str]] | None = None) -> list[Verdict]:
     slim = None
+    depts = build_depts(store, brain)
     if transport in ("auto", "slim") and slim_node_up() and os.environ.get("SLIM_SHARED_SECRET"):
         slim = SlimTransport(store.root, log)
         slim.start()
-        iso = slim.caller()
-        log("transport: A2A over SLIM (agent -> SLIM node -> gateway -> ISO gremlin on :10001)")
+        depts["iso"] = slim.caller()
+        log("transport: ISO over A2A over SLIM (agent -> SLIM node -> gateway -> ISO gremlin on :10001); CMPM, college, finaid in-process")
     elif transport == "slim":
         raise SystemExit("SLIM node is not up on 127.0.0.1:46357 (or SLIM_SHARED_SECRET unset). Start: uv run --script gremlin_slim.py node")
     elif transport == "a2a":
-        iso = over_a2a(f"http://127.0.0.1:{DEPT_PORT}")
-        log(f"transport: A2A over HTTP to a dept_gremlin.py you started on :{DEPT_PORT}")
+        depts["iso"] = over_a2a(f"http://127.0.0.1:{DEPT_PORT}")
+        log(f"transport: ISO over A2A over HTTP to a dept_gremlin.py you started on :{DEPT_PORT}; the rest in-process")
     else:
-        iso = in_process(DeptGremlin("iso", store=store, brain=brain))
         log("transport: in-process (no SLIM node detected)")
-    log(f"boxes: {store.root}")
-    adv = Advocate(store=store, depts={"iso": iso})
+    log(f"boxes: {store.root}   departments: {', '.join(depts)}")
+    adv = Advocate(store=store, depts=depts)
     verdicts: list[Verdict] = []
+    questions = questions or QUESTIONS
     try:
-        for label, question in QUESTIONS[:2]:
+        for label, question in questions:
+            if label == "e2":
+                try:
+                    store.set_field("student", "days_to_deadline", "2")
+                except KeyError:
+                    store.append("student", 1, "days_to_deadline: 2")
+                log(f"\n  student box changed: days_to_deadline: 2 (new information) -> re-ask c1")
             log(f"\n== {label}: {question}")
-            v = adv.ask_sync(question, f"demo-{label.lower()}")
+            v = adv.ask_sync(question, f"demo-{label}")
             show(v, log)
             verdicts.append(v)
             if v.kind == "ASK_STUDENT":
-                for f in v.ask:
-                    if store.load("student").permission(f, "iso") == "ask":
-                        approve(store, "student", f, "iso")
-                        log(f"\n  student approves sharing '{f}' with ISO (approve_share) -> re-ask")
-                        v = adv.ask_sync(question, f"demo-{label.lower()}-b")
-                        show(v, log)
-                        verdicts.append(v)
-        label, question = QUESTIONS[2]
-        log(f"\n== {label}: {question}   (final_quarter: {store.load('student').fields.get('final_quarter')})")
-        before = adv.ask_sync(question, "demo-q3")
-        show(before, log)
-        verdicts.append(before)
-        store.set_field("student", "final_quarter", "yes")
-        store.set_field("student", "units", "8")
-        log("\n  student box changed: final_quarter: yes, units: 8  -> re-ask")
-        after = adv.ask_sync(question, "demo-q3-final")
-        show(after, log)
-        verdicts.append(after)
-        log(f"\n  verdict change: {before.kind} -> {after.kind}")
+                asked = [(r.dept, f) for r in v.depts for f in r.ask
+                         if store.load("student").permission(f, r.dept) == "ask"]
+                for dept, f in asked:
+                    approve(store, "student", f, dept)
+                    log(f"\n  student approves sharing '{f}' with {dept.upper()} (approve_share)")
+                if asked:
+                    log("  -> re-ask with the approved fields")
+                    v = adv.ask_sync(question, f"demo-{label}-b")
+                    show(v, log)
+                    verdicts.append(v)
+        if len(verdicts) >= 2 and questions[0][0] == "c1" and questions[-1][0] == "e2":
+            log(f"\n  verdict change on new information: {verdicts[0].kind} (c1) -> {verdicts[-1].kind} (e2)")
     finally:
         if slim:
             slim.stop()
@@ -209,7 +218,7 @@ def prepare_boxes(live: bool) -> MarkdownBoxStore:
         return MarkdownBoxStore(BOXES)
     target = HERE / "out" / "demo" / datetime.now().strftime("%Y%m%d-%H%M%S")
     target.mkdir(parents=True, exist_ok=True)
-    for name in ("iso", "student"):
+    for name in REAL:
         src = MarkdownBoxStore(BOXES).path(name)
         shutil.copy(src, target / f"{name}.md")
     return MarkdownBoxStore(target)
@@ -219,5 +228,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--live", action="store_true", help="use docs/boxes/ directly instead of a fresh copy")
     parser.add_argument("--transport", choices=["auto", "inprocess", "a2a", "slim"], default="auto")
+    parser.add_argument("--questions", default="", help="comma-separated ids from QUESTIONS (default: all)")
     args = parser.parse_args()
-    run(prepare_boxes(args.live), brain=default_brain(), transport=args.transport)
+    wanted = {q.strip() for q in args.questions.split(",") if q.strip()}
+    chosen = [q for q in QUESTIONS if not wanted or q[0] in wanted]
+    run(prepare_boxes(args.live), brain=default_brain(), transport=args.transport, questions=chosen)

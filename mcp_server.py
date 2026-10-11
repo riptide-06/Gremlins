@@ -1,8 +1,9 @@
 """The advocate over MCP. Four tools: ask, my_box, approve_share, open_items.
 
 stdio (Claude Desktop, Claude Code):
-    uv run mcp_server.py                     # ISO in-process
-    ISO_URL=http://127.0.0.1:10001 uv run mcp_server.py   # ISO over A2A
+    uv run mcp_server.py                     # every department with a box, in-process
+    DEPT_URLS=iso=http://127.0.0.1:10001,cmpm=http://127.0.0.1:10002 uv run mcp_server.py   # over A2A
+    STUDENT_BOX=student-me uv run mcp_server.py           # another student box under docs/boxes/
 
 Claude Desktop config:
     {"mcpServers": {"gremlin": {"command": "uv", "args": ["run", "--directory", "<repo>", "mcp_server.py"]}}}
@@ -86,7 +87,7 @@ def build_mcp(resolve: Callable[[], Advocate | None], **settings) -> FastMCP:
 
 
 def main() -> None:
-    adv = default_advocate(brain=default_brain(), iso_url=os.environ.get("ISO_URL"))
+    adv = default_advocate(brain=default_brain(), student_box=os.environ.get("STUDENT_BOX", "student"))
     build_mcp(lambda: adv).run("stdio")
 
 

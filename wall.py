@@ -55,12 +55,27 @@ def approved_fields(student: Box, dept: str) -> set[str]:
     return out
 
 
-def protected_values(student: Box, dept: str) -> dict[str, str]:
-    """Field values that must not travel to or come back from this department."""
+_LOW_SIGNAL = {"yes", "no", "true", "false", "none", "n/a", "na", "-"}
+
+
+def _identifying(value: str) -> bool:
+    """A value worth redacting: not a yes/no token and not a bare small integer such as
+    a unit count (a GPA like 3.4 or a date still counts; a `no` field is still protected)."""
+    v = value.strip()
+    if len(v) < 3 or v.lower() in _LOW_SIGNAL:
+        return False
+    return not (len(v) < 4 and v.isdigit())
+
+
+def protected_values(student: Box, dept: str, policy_text: str = "") -> dict[str, str]:
+    """Field values that must not travel to or come back from this department.
+    A value that appears verbatim in the department's own policy text (say `F-1`)
+    is policy, not a leak, and is not treated as this student's secret."""
     out = {}
+    policy = policy_text.lower()
     for name, value in student.fields.items():
         perm = student.permission(name, dept)
-        if perm in ("never", "no") and len(value.strip()) >= 3:
+        if perm in ("never", "no") and _identifying(value) and not (policy and value.strip().lower() in policy):
             out[name] = value.strip()
     return out
 
@@ -157,7 +172,7 @@ def inbound(answer: dict, dept_box: Box, student: Box, dept: str) -> Inbound:
     blob = " ".join([str(answer.get("answer", "")),
                      *[str(o.get("option", "")) + " " + " ".join(str(c) for c in (o.get("conditions") or []))
                        for o in original if isinstance(o, dict)]])
-    for name, value in protected_values(student, dept).items():
+    for name, value in protected_values(student, dept, dept_box.text).items():
         if re.search(re.escape(value), blob, re.IGNORECASE):
             result.rejected, result.reason = True, f"answer echoed protected field {name}"
             result.answer = {**empty_answer(), "escalate": bool(a.get("escalate"))}

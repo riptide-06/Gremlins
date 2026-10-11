@@ -6,8 +6,9 @@ Callers build `system` and `user` from the current box only. A Brain never
 keeps history, never sees a previous call, and returns None when the model
 could not produce JSON that conforms to `schema` within one retry.
 
-LiteLLMBrain: groq/openai/gpt-oss-120b, fallback
-nvidia_nim/nvidia/nemotron-3-super-120b-a12b, temperature 0, JSON mode.
+LiteLLMBrain: groq/openai/gpt-oss-120b, then nvidia_nim/nvidia/nemotron-3-super-120b-a12b,
+then gemini/gemini-2.5-flash (GREMLIN_MODELS overrides), temperature 0, JSON mode.
+CachedBrain: replay cache keyed by the prompt hash, so demos are instant and identical.
 ScriptedBrain: canned answers for tests and offline demos.
 BayleafBrain: TODO stub for the Bayleaf runtime.
 """
@@ -20,7 +21,23 @@ from typing import Any, Protocol
 
 PRIMARY = "groq/openai/gpt-oss-120b"
 FALLBACK = "nvidia_nim/nvidia/nemotron-3-super-120b-a12b"
+THIRD = "gemini/gemini-2.5-flash"
 MAX_TOKENS = 2048
+CACHE_DIR = Path(__file__).resolve().parent / "out" / "cache"
+
+
+def model_list() -> list[str]:
+    """GREMLIN_MODELS="groq/...,nvidia_nim/...,gemini/..." overrides the default order.
+    Only models whose provider key is present are kept, so a missing key never costs a call."""
+    raw = os.environ.get("GREMLIN_MODELS")
+    models = [m.strip() for m in raw.split(",") if m.strip()] if raw else [PRIMARY, FALLBACK, THIRD]
+    keys = {"groq/": "GROQ_API_KEY", "nvidia_nim/": "NVIDIA_NIM_API_KEY", "gemini/": "GEMINI_API_KEY"}
+    out = []
+    for m in models:
+        needed = next((k for prefix, k in keys.items() if m.startswith(prefix)), None)
+        if needed is None or os.environ.get(needed):
+            out.append(m)
+    return out or [PRIMARY, FALLBACK]
 
 _TYPES = {"object": dict, "array": list, "string": str, "number": (int, float),
           "integer": int, "boolean": bool, "null": type(None)}
@@ -125,6 +142,50 @@ class LiteLLMBrain:
         return None
 
 
+class CachedBrain:
+    """Replay cache around any Brain: the same (system, user, schema) returns the same
+    answer without a model call. Keyed by a hash of the prompt, so a changed box or a
+    changed context is a different key. Session ids are not in the prompt, so a demo
+    replays identically. GREMLIN_CACHE=0 turns it off; GREMLIN_CACHE_DIR moves it."""
+
+    def __init__(self, inner: Brain, directory: str | os.PathLike | None = None):
+        self.inner = inner
+        self.dir = Path(directory or os.environ.get("GREMLIN_CACHE_DIR") or CACHE_DIR)
+        self.hits = 0
+        self.misses = 0
+
+    @property
+    def last(self) -> dict:
+        return getattr(self.inner, "last", {}) or {}
+
+    def key(self, system: str, user: str, schema: dict) -> str:
+        import hashlib
+        blob = json.dumps([system, user, schema], sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
+
+    def complete(self, system: str, user: str, schema: dict) -> dict | None:
+        path = self.dir / f"{self.key(system, user, schema)}.json"
+        if path.exists():
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if conforms(value, schema):
+                    self.hits += 1
+                    if hasattr(self.inner, "last"):
+                        self.inner.last = {"attempts": [{"model": "cache", "ok": True}], "model": "cache"}
+                    return value
+            except (ValueError, OSError):
+                pass
+        value = self.inner.complete(system, user, schema)
+        self.misses += 1
+        if value is not None:
+            try:
+                self.dir.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(value, ensure_ascii=False, indent=1), encoding="utf-8")
+            except OSError:
+                pass
+        return value
+
+
 class BayleafBrain:
     """TODO: Bayleaf runtime. Same contract: complete(system, user, schema) -> dict | None.
 
@@ -155,8 +216,12 @@ def load_env_file(path: str | os.PathLike | None = None) -> None:
 
 
 def default_brain() -> Brain:
-    """LiteLLMBrain when a provider key is present, else a ScriptedBrain that returns None."""
+    """LiteLLMBrain (wrapped in the replay cache unless GREMLIN_CACHE=0) when a provider
+    key is present, else a ScriptedBrain that returns None."""
     load_env_file()
-    if os.environ.get("GROQ_API_KEY") or os.environ.get("NVIDIA_NIM_API_KEY"):
-        return LiteLLMBrain()
+    if os.environ.get("GROQ_API_KEY") or os.environ.get("NVIDIA_NIM_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+        brain: Brain = LiteLLMBrain(models=model_list())
+        if os.environ.get("GREMLIN_CACHE", "1") not in ("0", "false", "no"):
+            brain = CachedBrain(brain)
+        return brain
     return ScriptedBrain()

@@ -215,7 +215,8 @@ def parse_box(text: str, name: str = "box") -> Box:
                 box.faq[ident] = FAQ(ident, cols[0], cols[1])
             elif kind == "E":
                 cols += [""] * (2 - len(cols))
-                box.escalations[ident] = Escalation(ident, cols[0], cols[1])
+                # the `when` column may hold a regex with alternations (a|b|c): rejoin it
+                box.escalations[ident] = Escalation(ident, cols[0], "|".join(cols[1:]).strip())
             continue
 
         kv = _KV.match(stripped)
@@ -225,8 +226,8 @@ def parse_box(text: str, name: str = "box") -> Box:
                 box.preferences.append(value)
             elif current is None:
                 box.meta[key] = value
-            else:
-                box.fields[key] = value
+            elif value:
+                box.fields[key] = value   # a blank `key:` line is a field the student has not filled in
     return box
 
 
@@ -380,12 +381,17 @@ STUDENT_TEMPLATE = """# Student box
 
 student: {student}
 authority_order: federal > state > campus > department
-synthetic: yes
+synthetic: no
+schema: 2
+updated: {today}
 
 ## 1. Profile
 
 name: {name}
 email: {email}
+level: undergraduate
+rcl_on_file: no
+part_time_program: no
 
 ## 2. Preferences
 
@@ -395,20 +401,35 @@ prefer: sooner
 
 ## 3. Sharing permissions
 
-Field | ISO
---- | ---
-name | never
-email | never
+Field | ISO | CMPM | College | FinAid
+--- | --- | --- | --- | ---
+name | never | never | never | never
+email | never | never | never | never
+level | yes | yes | yes | yes
+visa | yes | no | no | ask
+rcl_on_file | yes | no | ask | no
+first_quarter | yes | no | no | no
+units | ask | ask | ask | ask
+hours | ask | ask | ask | ask
+gpa | no | ask | ask | ask
+major | ask | yes | yes | ask
+major_declared | ask | yes | yes | no
+final_quarter | ask | ask | ask | ask
+days_to_deadline | yes | yes | yes | yes
+days_to_i20_end | yes | no | no | no
+aid | no | no | ask | ask
+aid_type | never | no | no | ask
+part_time_program | ask | ask | ask | ask
 
 ## 4. Session log
 
 ## 5. Converged answers
 
-## 6. Escalated briefs
+## 6. Escalated and disputed briefs
 
-## 7. Shared fields
+## 7. Shared fields and approvals
 
-## 8. Open items
+## 8. Open items the student must answer
 """
 
 
@@ -416,7 +437,11 @@ def seed_student_box(store: BoxStore, name: str, student_id: str, display_name: 
     """Create a student box on first login. Returns False if one already exists."""
     if store.exists(name):
         return False
-    clean = lambda s: str(s or "").replace("\n", " ").strip()
-    store.write(name, STUDENT_TEMPLATE.format(student=clean(student_id), name=clean(display_name),
-                                              email=clean(email)))
+    clean = lambda s: str(s or "").replace("\n", " ").replace("{", "(").replace("}", ")").strip()
+    template = STUDENT_TEMPLATE
+    root = getattr(store, "root", None)
+    if root is not None and (Path(root) / "student.template.md").exists():
+        template = (Path(root) / "student.template.md").read_text(encoding="utf-8")
+    store.write(name, template.format(student=clean(student_id), name=clean(display_name),
+                                      email=clean(email), today=stamp()[:10]))
     return True
