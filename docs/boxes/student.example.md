@@ -12,6 +12,7 @@ visa: F-1
 level: undergraduate
 units: 16
 hours: 10
+first_quarter: no
 final_quarter: no
 rcl_on_file: no
 major: Computer Science
@@ -34,6 +35,7 @@ visa | yes | no
 level | yes | yes
 units | yes | yes
 hours | ask | no
+first_quarter | yes | yes
 final_quarter | yes | yes
 rcl_on_file | yes | no
 major | yes | yes

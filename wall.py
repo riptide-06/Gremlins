@@ -151,9 +151,12 @@ def inbound(answer: dict, dept_box: Box, student: Box, dept: str) -> Inbound:
         result.dropped_detail += [f"uncited sentence: {s[:60]}" for s in sentences if s not in cited]
         a["answer"] = " ".join(cited)
 
-    # leak check: a department answer must never echo protected student values
-    blob = " ".join([a.get("answer", ""), *[str(o.get("option", "")) + " " + " ".join(o.get("conditions", []))
-                                            for o in a["options"]]])
+    # leak check on the ORIGINAL answer: a department answer must never echo protected
+    # student values, even in a sentence that was already dropped as uncited
+    original = answer.get("options") or []
+    blob = " ".join([str(answer.get("answer", "")),
+                     *[str(o.get("option", "")) + " " + " ".join(str(c) for c in (o.get("conditions") or []))
+                       for o in original if isinstance(o, dict)]])
     for name, value in protected_values(student, dept).items():
         if re.search(re.escape(value), blob, re.IGNORECASE):
             result.rejected, result.reason = True, f"answer echoed protected field {name}"

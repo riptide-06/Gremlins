@@ -11,7 +11,7 @@ def test_outbound_applies_yes_no_ask_never(store):
     assert "hours" not in out.context and out.ask == ["hours"]
     assert "name" not in out.context and "email" not in out.context  # never: not even mentioned
     assert "not shared" not in (out.context.get("name"), out.context.get("email"))
-    assert set(out.shared) == {"visa", "level", "units", "final_quarter", "rcl_on_file", "major", "expected_graduation"}
+    assert set(out.shared) == {"visa", "level", "units", "first_quarter", "final_quarter", "rcl_on_file", "major", "expected_graduation"}
 
 
 def test_outbound_is_per_department(store):
