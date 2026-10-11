@@ -151,3 +151,11 @@ def test_advocate_writes_its_verdict_into_the_cubby(cubby):
     text = list(fake.files.values())[0]["text"]
     assert "SESSION | s-cubby | CONVERGED" in text and "SHARED | iso" in text
     assert "Demo Student" not in json.dumps(v.to_dict())
+
+
+def test_set_permission_in_the_cubby(cubby):
+    fake, store = cubby
+    seed_student_box(store, "student", "s-1", "Demo Student", "demo@ucsc.edu")
+    store.set_permission("student", "hours", "college", "yes")
+    assert store.load("student").permission("hours", "college") == "yes"
+    assert store.load("student").permission("hours", "iso") == "ask"

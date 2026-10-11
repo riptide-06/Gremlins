@@ -390,6 +390,38 @@ class MarkdownBoxStore:
             raise KeyError(key)
         path.write_text(text, encoding="utf-8")
 
+    def set_permission(self, name: str, field_name: str, dept: str, value: str) -> None:
+        """Change one cell of the student's sharing table (the student's own decision, never an agent's)."""
+        path = self.path(name)
+        text = path.read_text(encoding="utf-8")
+        old, new = permission_row_edit(text, field_name, dept, value)
+        path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def permission_row_edit(text: str, field_name: str, dept: str, value: str) -> tuple[str, str]:
+    """The (old line, new line) pair that sets one cell of the sharing-permissions table.
+    Raises KeyError when the field row or the department column does not exist."""
+    value = value.strip().lower()
+    if value not in PERMISSION_VALUES:
+        raise ValueError(f"permission must be one of {sorted(PERMISSION_VALUES)}")
+    lines = text.splitlines()
+    header_i = next((i for i, l in enumerate(lines) if "|" in l and _split(l)[0].lower() == "field"), None)
+    if header_i is None:
+        raise KeyError("permissions table")
+    header = _split(lines[header_i])
+    col = next((i for i, h in enumerate(header) if h.lower() == dept.lower()), None)
+    if col is None or col == 0:
+        raise KeyError(dept)
+    for l in lines[header_i + 1:]:
+        if not l.strip():
+            break
+        cells = _split(l)
+        if cells and cells[0] == field_name and not _TABLE_SEP.match(l):
+            cells += [""] * (len(header) - len(cells))
+            cells[col] = value
+            return l, " | ".join(cells)
+    raise KeyError(field_name)
+
 
 class GoogleDocBoxStore:
     """TODO: read a box straight from the student's Google Doc.

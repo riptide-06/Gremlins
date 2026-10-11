@@ -127,3 +127,16 @@ def test_field_names_normalize_onto_the_student_vocabulary():
     assert normalize_field("desired_units") == "units"
     assert normalize_field("") is None and normalize_field("ramen_preference") is None
     assert all(normalize_field(f) == f for f in STUDENT_FIELDS)
+
+
+def test_set_permission_edits_one_cell(store):
+    store.set_permission("student", "hours", "iso", "yes")
+    s = store.load("student")
+    assert s.permission("hours", "iso") == "yes" and s.permission("hours", "registrar") == "no"
+    import pytest
+    with pytest.raises(KeyError):
+        store.set_permission("student", "hours", "nobody", "yes")
+    with pytest.raises(KeyError):
+        store.set_permission("student", "no_such_field", "iso", "yes")
+    with pytest.raises(ValueError):
+        store.set_permission("student", "hours", "iso", "maybe")

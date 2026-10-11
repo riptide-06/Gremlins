@@ -91,14 +91,17 @@ def redact(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
 
 
 def outbound(student: Box, dept: str, question: str, approvals: set[str] | None = None,
-             fields: list[str] | None = None) -> Outbound:
-    """`fields` limits which permitted fields are sent this round (None sends every permitted one)."""
+             fields: list[str] | None = None, declined: set[str] | None = None) -> Outbound:
+    """`fields` limits which permitted fields are sent this round (None sends every permitted one).
+    `declined` are ask-fields the student chose not to share for this question: sent as "not shared"."""
     approvals = approved_fields(student, dept) | (approvals or set())
     out = Outbound(dept=dept, question=question)
     for name, value in student.fields.items():
         perm = student.permission(name, dept)
         if perm == "ask" and name in approvals:
             perm = "yes"
+        elif perm == "ask" and declined and name in declined:
+            perm = "no"
         if perm == "yes" and fields is not None and name not in fields:
             out.held.append(name)
         elif perm == "yes":

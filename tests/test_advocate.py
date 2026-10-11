@@ -161,3 +161,11 @@ def test_disputed_at_equal_authority_and_precedence_otherwise(store, tmp_path):
 def test_default_advocate_builds_iso_in_process(store):
     adv = default_advocate(store=store, brain=ScriptedBrain(default=answer()))
     assert list(adv.depts) == ["iso"] and adv.ask_sync("q").kind == "CONVERGED"
+
+
+def test_declined_ask_field_is_sent_as_not_shared_and_does_not_stall(store):
+    adv, brain = advocate_with(store, answer(needs=["hours"], options=[]), answer())
+    v = adv.ask_sync("Can I add 12 hours?", "s16", declined={"hours"})
+    assert v.kind == "CONVERGED" and v.ask == []            # no ASK_STUDENT: the student already said no
+    assert context_of(brain, 0)["hours"] == "not shared"    # the department was told it was withheld
+    assert v.depts[0].blocked == ["hours"]

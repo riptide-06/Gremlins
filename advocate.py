@@ -169,13 +169,15 @@ class Advocate:
         return self.store.load(self.dept_boxes.get(dept, dept))
 
     # -- one department, up to two rounds ---------------------------------------
-    async def consult(self, dept: str, student: Box, question: str, session_id: str) -> DeptResult:
+    async def consult(self, dept: str, student: Box, question: str, session_id: str,
+                      declined: set[str] | None = None) -> DeptResult:
         result = DeptResult(dept=dept)
         dept_box = self.dept_box(dept)
         approvals = approved_fields(student, dept)
         fields = relevant_fields(dept_box, student)
+        declined = set(declined or ())
         for round_no in (1, 2):
-            out = outbound(student, dept, question, approvals, fields=fields)
+            out = outbound(student, dept, question, approvals, fields=fields, declined=declined)
             result.rounds.append(out)
             log_shared(self.store, self.student_box, out, session_id)
             raw = await self.depts[dept](session_id, out.question, out.context)
@@ -191,6 +193,8 @@ class Advocate:
                     ask.append(n)                      # the student must supply it
                 elif perm == "yes" or (perm == "ask" and n in approvals):
                     resend.append(n)
+                elif perm == "ask" and n in declined:
+                    blocked.append(n)                  # the student said no for this question
                 elif perm == "ask":
                     ask.append(n)
                 else:
@@ -202,18 +206,18 @@ class Advocate:
         return result
 
     # -- the whole question --------------------------------------------------------
-    async def ask(self, question: str, session_id: str | None = None) -> Verdict:
+    async def ask(self, question: str, session_id: str | None = None, declined: set[str] | None = None) -> Verdict:
         session_id = session_id or uuid.uuid4().hex[:12]
         student = self.store.load(self.student_box)  # fresh: a flipped field changes the verdict
         depts = self.in_scope(student, question)
         # every department is consulted at once; none sees another's answer (no central decision-maker)
-        results = list(await asyncio.gather(*[self.consult(d, student, question, session_id) for d in depts]))
+        results = list(await asyncio.gather(*[self.consult(d, student, question, session_id, declined) for d in depts]))
         verdict = self.decide(student, question, session_id, results)
         self.write(verdict)
         return verdict
 
-    def ask_sync(self, question: str, session_id: str | None = None) -> Verdict:
-        return asyncio.run(self.ask(question, session_id))
+    def ask_sync(self, question: str, session_id: str | None = None, declined: set[str] | None = None) -> Verdict:
+        return asyncio.run(self.ask(question, session_id, declined))
 
     # -- deciding -------------------------------------------------------------------
     def decide(self, student: Box, question: str, session_id: str, results: list[DeptResult]) -> Verdict:

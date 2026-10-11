@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gremlin Labs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: app shell (sidebar / chat / setup panel) for the signed-in screens; centered single-column pages for sign-in, brief, cubby, setup. Chunky outlines, hard offset shadows, one orange primary. */
+:root{
+  --bg:#EEEFE9; --panel:#F7F7F2; --card:#FFFFFF; --ink:#151515; --muted:#5A5A55; --line:#151515;
+  --orange:#F54E00; --yellow:#F7A501; --blue:#1D4AFF; --green:#B9E5A6; --sky:#DCE6FF; --wood:#E8B86D; --wood2:#F3CF8C;
+  --on-accent:#151515; --on-blue:#FFFFFF; --code-bg:#151515; --code-fg:#EEEFE9; --warn-bg:#FFF4EC;
+  --display:'Sora',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#16171A; --panel:#1E1F23; --card:#26272C; --ink:#EEEFE9; --muted:#A9ABA3; --line:#EEEFE9;
+  --orange:#FF6A2B; --yellow:#E6A020; --blue:#7C98FF; --green:#3E7A3A; --sky:#2A3A6B; --wood:#B98B45; --wood2:#D4A95C;
+  --on-accent:#151515; --on-blue:#151515; --code-bg:#0E0F11; --code-fg:#EEEFE9; --warn-bg:#3A2418; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#16171A; --panel:#1E1F23; --card:#26272C; --ink:#EEEFE9; --muted:#A9ABA3; --line:#EEEFE9;
+  --orange:#FF6A2B; --yellow:#E6A020; --blue:#7C98FF; --green:#3E7A3A; --sky:#2A3A6B; --wood:#B98B45; --wood2:#D4A95C;
+  --on-accent:#151515; --on-blue:#151515; --code-bg:#0E0F11; --code-fg:#EEEFE9; --warn-bg:#3A2418; color-scheme:dark }
+
+body{background:var(--bg);color:var(--ink);font-family:var(--display);font-size:15px;line-height:1.5}
+*{box-sizing:border-box}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-0.02em}
+p{margin:0}
+a{color:var(--blue)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.screen[hidden]{display:none}
+.screen{min-height:100vh;display:flex;flex-direction:column}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 24px;border-bottom:1.5px solid var(--line);background:var(--card)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)}
+.brand b{font-size:20px;font-weight:800;display:block;line-height:1.1}
+.brand small{font-size:11px;color:var(--muted)}
+.nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.nav a{font-weight:600;font-size:14px;color:var(--ink);text-decoration:none;padding:8px 12px;border-radius:999px;border:1.5px solid transparent}
+.nav a.on{border-color:var(--line);background:var(--yellow);color:#151515}
+.user{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--card);box-shadow:3px 3px 0 var(--line)}
+.user .dot{width:8px;height:8px;border-radius:50%;background:#2E9E4F}
+.user .mail{font-size:13px;font-weight:600}
+.tag{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--blue);color:var(--on-blue)}
+
+/* buttons, chips, cards */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:11px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:inherit;font-weight:600;font-size:14px;text-decoration:none;cursor:pointer}
+.btn.primary{background:var(--orange);color:var(--on-accent);font-weight:800;box-shadow:4px 4px 0 var(--line)}
+.btn.primary:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--line)}
+.btn.lift{box-shadow:3px 3px 0 var(--line)}
+.btn.small{min-height:36px;padding:6px 10px;font-size:12px;border-radius:999px;background:var(--bg)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.04em;padding:6px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--yellow);color:#151515}
+.chip{font-family:var(--mono);font-size:11px;padding:4px 8px;border:1.5px solid var(--line);border-radius:6px;background:var(--bg)}
+.cite{font-family:var(--mono);font-size:11px;padding:2px 6px;border:1.5px solid var(--line);border-radius:6px;background:var(--bg);white-space:nowrap}
+.card{border:1.5px solid var(--line);border-radius:14px;background:var(--card);padding:16px}
+.card.lift{box-shadow:4px 4px 0 var(--line)}
+.muted{color:var(--muted)}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--muted)}
+.num{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#151515;flex:0 0 26px}
+pre.code{margin:0;padding:10px 12px;border-radius:8px;background:var(--code-bg);color:var(--code-fg);font-family:var(--mono);font-size:11.5px;line-height:1.5;overflow-x:auto}
+.wrap{width:100%;max-width:980px;margin:0 auto;padding:40px 24px 72px;display:flex;flex-direction:column;gap:28px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.grid3,.grid2{grid-template-columns:1fr}}
+
+/* app shell */
+.shell{display:flex;flex-wrap:wrap;align-items:stretch;flex:1 1 auto}
+.side{flex:0 0 260px;display:flex;flex-direction:column;gap:16px;padding:20px 16px;border-right:1.5px solid var(--line);background:var(--panel)}
+.side .list{display:flex;flex-direction:column;gap:6px}
+.side .list a{display:block;text-decoration:none;color:var(--ink);font-size:14px;padding:10px 12px;border-radius:10px;border:1.5px solid transparent}
+.side .list a.on{border-color:var(--line);background:var(--card);font-weight:600}
+.cubbycard{display:flex;flex-direction:column;gap:6px;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);box-shadow:4px 4px 0 var(--line);text-decoration:none;color:var(--ink);font-size:12px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;min-height:720px}
+.mainhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 24px;border-bottom:1.5px solid var(--line);background:var(--card)}
+.thread{flex:1 1 auto;display:flex;flex-direction:column;gap:20px;padding:24px;max-width:860px;width:100%;margin:0 auto}
+.view[hidden]{display:none}
+.view{flex:1 1 auto;display:flex;flex-direction:column}
+.me{align-self:flex-end;max-width:78%;padding:12px 16px;border:1.5px solid var(--line);border-radius:16px 16px 4px 16px;background:var(--sky);font-size:15px}
+.grem{display:flex;gap:12px;align-items:flex-start}
+.grem .av{flex:0 0 36px}
+.reply{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:12px;padding:16px 18px;border:1.5px solid var(--line);border-radius:4px 16px 16px 16px;background:var(--card);box-shadow:4px 4px 0 var(--line)}
+.verdict{font-size:11px;font-weight:800;letter-spacing:.04em;padding:4px 10px;border:1.5px solid var(--line);border-radius:999px;color:#151515}
+.v-ok{background:var(--green)}.v-dis{background:var(--yellow)}.v-ask{background:var(--sky)}.v-esc{background:var(--orange)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mini{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);font-size:13px}
+.why{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-left:4px solid var(--orange);background:var(--warn-bg);border-radius:0 10px 10px 0;font-size:13px}
+.receipt{font-size:12px;color:var(--muted)}
+.composer{padding:16px 24px 20px;border-top:1.5px solid var(--line);background:var(--card)}
+.composer .in{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.composer input{flex:1 1 auto;min-width:0;font:inherit;font-size:15px;padding:13px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+.send{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:var(--blue);border:1.5px solid var(--line);border-radius:12px;box-shadow:3px 3px 0 var(--line)}
+.panel{flex:0 0 320px;display:flex;flex-direction:column;gap:16px;padding:20px 18px 28px;border-left:1.5px solid var(--line);background:var(--panel)}
+.step{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);font-size:13px;font-weight:600}
+.vis{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1.5px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tscroll{overflow-x:auto;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+.proto{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid var(--line);border-radius:999px;background:var(--card);box-shadow:3px 3px 0 var(--line);font-size:12px;z-index:5}
+.proto a{font-weight:800}
+
+/* gremlin */
+.gslot svg{overflow:visible;color:var(--ink)}
+@keyframes g-bob{from{transform:translateY(0) rotate(-3deg)}to{transform:translateY(-9px) rotate(3deg)}}
+@keyframes g-wave{from{transform:rotate(-14deg)}to{transform:rotate(20deg)}}
+@keyframes g-earl{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+@keyframes g-earr{from{transform:rotate(7deg)}to{transform:rotate(-7deg)}}
+@keyframes g-blink{0%,90%,100%{transform:scaleY(1)}94%{transform:scaleY(.08)}}
+.g-all{transform-box:view-box;transform-origin:130px 178px;animation:g-bob 1.15s ease-in-out infinite alternate}
+.g-arm{transform-box:view-box;transform-origin:182px 134px;animation:g-wave .85s ease-in-out infinite alternate}
+.g-earl{transform-box:view-box;transform-origin:96px 86px;animation:g-earl 1s ease-in-out infinite alternate}
+.g-earr{transform-box:view-box;transform-origin:164px 86px;animation:g-earr 1s ease-in-out infinite alternate}
+.g-eyes{transform-box:view-box;transform-origin:130px 112px;animation:g-blink 4.5s linear infinite}
+@media (prefers-reduced-motion:reduce){.g-all,.g-arm,.g-earl,.g-earr,.g-eyes{animation:none}.btn.primary:hover{transform:none}}
+</style>
+<style>
+/* additions for the live app */
+.hiddenx{display:none !important}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.code-big{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:.18em;padding:10px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);display:inline-block}
+.v-un{background:#DDD}
+.ledger td.mono,.mono{font-family:var(--mono);font-size:11.5px}
+.err{color:#B00020;font-size:13px}
+.inline-edit{font:inherit;font-family:var(--mono);font-size:12px;padding:3px 6px;border:1.5px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);width:120px}
+select.perm{font:inherit;font-size:12px;padding:3px 6px;border:1.5px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.demo-banner[hidden]{display:none}
+.demo-banner{display:flex;align-items:center;gap:10px;padding:8px 24px;background:var(--yellow);color:#151515;border-bottom:1.5px solid var(--line);font-size:13px;font-weight:600}
+.thread .reply p{line-height:1.55}
+.q-card{cursor:pointer}
+</style>
+<template id="tpl-gremlin">
+<svg viewBox="0 0 260 280" role="img" aria-label="A green gremlin sitting on a wooden cubby box, waving">
+  <g>
+    <rect x="40" y="186" width="180" height="84" rx="10" fill="#E8B86D" stroke="currentColor" stroke-width="2"></rect>
+    <rect x="40" y="186" width="180" height="22" rx="10" fill="#F3CF8C" stroke="currentColor" stroke-width="2"></rect>
+    <line x1="62" y1="208" x2="62" y2="270" stroke="currentColor" stroke-width="2" opacity=".35"></line>
+    <line x1="198" y1="208" x2="198" y2="270" stroke="currentColor" stroke-width="2" opacity=".35"></line>
+    <rect x="86" y="222" width="88" height="30" rx="6" fill="#FFFFFF" stroke="currentColor" stroke-width="2"></rect>
+    <text x="130" y="242" text-anchor="middle" font-family="Sora, sans-serif" font-size="12" font-weight="800" fill="#151515">MY CUBBY</text>
+    <rect x="98" y="192" width="64" height="8" rx="4" fill="#151515"></rect>
+  </g>
+  <g class="g-all">
+    <g>
+      <rect x="92" y="150" width="20" height="52" rx="10" fill="#6CC26B" stroke="currentColor" stroke-width="2"></rect>
+      <rect x="148" y="150" width="20" height="52" rx="10" fill="#6CC26B" stroke="currentColor" stroke-width="2"></rect>
+      <ellipse cx="100" cy="204" rx="16" ry="9" fill="#5AA85A" stroke="currentColor" stroke-width="2"></ellipse>
+      <ellipse cx="160" cy="204" rx="16" ry="9" fill="#5AA85A" stroke="currentColor" stroke-width="2"></ellipse>
+    </g>
+    <g class="g-earl"><path d="M88 92 C70 70, 52 44, 46 26 C68 34, 92 50, 104 74 Z" fill="#6CC26B" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M86 84 C76 70, 66 54, 60 42 C72 50, 84 62, 92 76 Z" fill="#F9A7B0"></path></g>
+    <g class="g-earr"><path d="M172 92 C190 70, 208 44, 214 26 C192 34, 168 50, 156 74 Z" fill="#6CC26B" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M174 84 C184 70, 194 54, 200 42 C188 50, 176 62, 168 76 Z" fill="#F9A7B0"></path></g>
+    <ellipse cx="130" cy="124" rx="58" ry="54" fill="#6CC26B" stroke="currentColor" stroke-width="2"></ellipse>
+    <ellipse cx="130" cy="148" rx="30" ry="20" fill="#B9E5A6"></ellipse>
+    <path d="M118 72 C120 62, 126 60, 128 70 M130 70 C132 58, 138 58, 140 70" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+    <g class="g-eyes"><circle cx="110" cy="112" r="14" fill="#FFFFFF" stroke="currentColor" stroke-width="2"></circle><circle cx="150" cy="112" r="14" fill="#FFFFFF" stroke="currentColor" stroke-width="2"></circle><circle cx="113" cy="114" r="6" fill="#151515"></circle><circle cx="153" cy="114" r="6" fill="#151515"></circle><circle cx="115" cy="111" r="2" fill="#FFFFFF"></circle><circle cx="155" cy="111" r="2" fill="#FFFFFF"></circle></g>
+    <circle cx="96" cy="132" r="6" fill="#F9A7B0" opacity=".8"></circle><circle cx="164" cy="132" r="6" fill="#F9A7B0" opacity=".8"></circle>
+    <path d="M108 138 Q130 160 152 138 Z" fill="#151515"></path><rect x="118" y="138" width="7" height="8" rx="2" fill="#FFFFFF"></rect><rect x="135" y="138" width="7" height="8" rx="2" fill="#FFFFFF"></rect>
+    <path d="M78 140 C62 150, 56 166, 64 180" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"></path><path d="M78 140 C62 150, 56 166, 64 180" fill="none" stroke="#6CC26B" stroke-width="8" stroke-linecap="round"></path>
+    <g class="g-arm"><path d="M182 134 C196 122, 206 104, 206 86" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"></path><path d="M182 134 C196 122, 206 104, 206 86" fill="none" stroke="#6CC26B" stroke-width="8" stroke-linecap="round"></path><circle cx="206" cy="82" r="9" fill="#6CC26B" stroke="currentColor" stroke-width="2"></circle></g>
+  </g>
+</svg>
+</template>
+<template id="tpl-logo">
+<svg viewBox="0 0 40 40" width="36" height="36" aria-hidden="true" style="color:var(--ink)"><path d="M12 14 C8 9, 5 5, 4 2 C9 4, 14 8, 17 12 Z" fill="#6CC26B" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M28 14 C32 9, 35 5, 36 2 C31 4, 26 8, 23 12 Z" fill="#6CC26B" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><circle cx="20" cy="22" r="15" fill="#6CC26B" stroke="currentColor" stroke-width="2"></circle><circle cx="15" cy="20" r="4" fill="#FFFFFF" stroke="currentColor" stroke-width="1.5"></circle><circle cx="25" cy="20" r="4" fill="#FFFFFF" stroke="currentColor" stroke-width="1.5"></circle><circle cx="16" cy="21" r="1.6" fill="#151515"></circle><circle cx="26" cy="21" r="1.6" fill="#151515"></circle><path d="M14 28 Q20 34 26 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+</template>
+
+<div id="demo-banner" class="demo-banner" hidden><span>JUDGE MODE</span><span style="font-weight:400">You are signed in as a synthetic student (Asha Rao, F-1, 17 units, CS: Game Design). Nothing here is a real person.</span><span style="flex:1"></span><button class="btn small" id="reset-demo" type="button">Reset the demo student</button></div>
+
+<!-- 1. SIGN IN -->
+<section id="s-signin" class="screen">
+  <header class="top">
+    <a class="brand" href="#signin"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <nav class="nav" aria-label="Primary"><a href="#how">How it works</a><a href="#byoa-public">Bring your own agent</a><a href="#signin" class="btn lift" id="nav-signin" style="min-height:40px;padding:8px 14px;border-radius:999px;font-weight:800">Sign in</a></nav>
+  </header>
+  <div class="wrap">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:40px">
+      <div class="gslot" data-size="300" style="flex:0 0 300px;max-width:100%"></div>
+      <div style="flex:1 1 380px;min-width:0;max-width:560px;display:flex;flex-direction:column;gap:20px">
+        <span class="pill" style="align-self:flex-start">UCSC STUDENTS AND STAFF</span>
+        <h1 style="font-size:clamp(34px,5vw,46px);line-height:1.08;font-weight:800">Your gremlin is waiting on your <span style="position:relative;display:inline-block">cubby<svg viewBox="0 0 160 14" width="100%" height="12" aria-hidden="true" style="position:absolute;left:0;bottom:-8px"><path d="M2 9 C30 2, 50 12, 80 6 S130 2, 158 8" fill="none" stroke="var(--orange)" stroke-width="5" stroke-linecap="round"></path></svg></span>.</h1>
+        <p style="font-size:17px;line-height:1.55">Three offices, three answers? Your gremlin asks all of them, keeps the receipts, and tells you who actually decides. Your data stays in a folder in your own UCSC Drive.</p>
+
+        <div id="connect-idle" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+          <button class="btn primary" id="connect-start" type="button" style="font-size:16px;min-height:50px;padding:13px 20px"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#FFFFFF" stroke="#151515" stroke-width="1.5"></circle><path d="M12 7v10M7 12h10" fill="none" stroke="#151515" stroke-width="2" stroke-linecap="round"></path></svg>Continue with UCSC Google</button>
+          <span class="muted" style="font-size:12px;line-height:1.5">Sign-in is Campus Cubbies' own approval page (UCSC Google, @ucsc.edu only). It creates <strong style="color:var(--ink)">My Cubby</strong> in your Drive if you don't have one, and your gremlin keeps its notes in a file there. Nothing leaves it unless you say so.</span>
+          <span class="err" id="connect-error" hidden></span>
+        </div>
+
+        <div id="connect-wait" class="card lift" hidden style="display:flex;flex-direction:column;gap:12px">
+          <div class="row"><span class="pill" style="background:var(--sky)">STEP 1 OF 2</span><strong>Approve this connection in Campus Cubbies</strong></div>
+          <p style="font-size:14px">A Campus Cubbies tab opened with this code filled in. Sign in with your UCSC Google account and press <em>Continue</em>. Approve only this request.</p>
+          <div class="row"><span class="code-big" id="user-code">----</span><a class="btn lift" id="approval-link" href="#" target="_blank" rel="noopener">Open Campus Cubbies again</a></div>
+          <div class="row muted" style="font-size:13px"><span class="spin"></span><span id="poll-status">Waiting for your approval. This page checks every 5 seconds.</span></div>
+          <div class="row"><button class="btn small" id="poll-now" type="button">I approved it</button><button class="btn small" id="connect-cancel" type="button">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="how" style="display:flex;flex-direction:column;gap:14px">
+      <span class="eyebrow">WHAT HAPPENS WHEN YOU SIGN IN</span>
+      <div class="grid3">
+        <div class="card lift" style="display:flex;flex-direction:column;gap:8px"><span class="num" style="background:var(--yellow)">1</span><strong>A cubby in your Drive</strong><span style="font-size:13px">One folder called My Cubby, owned by you (Campus Cubbies). Offices you allow can write to it. They can never read it.</span></div>
+        <div class="card lift" style="display:flex;flex-direction:column;gap:8px"><span class="num" style="background:var(--green)">2</span><strong>Your gremlin moves in</strong><span style="font-size:13px">It keeps one file there, reads it with your login, sends departments only the fields you allowed, and checks every answer against the department's own policy box.</span></div>
+        <div class="card lift" style="display:flex;flex-direction:column;gap:8px"><span class="num" style="background:var(--sky)">3</span><strong>Use any agent you like</strong><span style="font-size:13px">Chat here, or point Claude, a local model, or any MCP agent at your gremlin with your Campus Cubbies token. Same cubby, same rules, same citations.</span></div>
+      </div>
+      <div class="row"><span class="chip">A2A</span><span class="chip">SLIM</span><span class="chip">MCP</span><span class="chip">UCSC Google Drive</span><span class="muted" style="font-size:12px">Prototype. Synthetic data only. Not for sensitive records.</span></div>
+    </div>
+    <div id="byoa-public" style="display:flex;flex-direction:column;gap:10px">
+      <span class="eyebrow">BRING YOUR OWN AGENT</span>
+      <div class="grid2">
+        <div class="card lift" style="display:flex;flex-direction:column;gap:8px"><strong>Claude Desktop, Claude Code, any MCP client</strong><span style="font-size:13px">Pair your agent with Campus Cubbies (it gets a private token), then add this server with that token as the bearer.</span><pre class="code" id="mcp-config-public">{"mcpServers": {"gremlin": {"url": ".../mcp", "headers": {"Authorization": "Bearer <your Campus Cubbies token>"}}}}</pre></div>
+        <div class="card lift" style="display:flex;flex-direction:column;gap:8px"><strong>Run it on your laptop</strong><span style="font-size:13px">Nothing leaves your machine except the questions you ask the departments.</span><pre class="code">git clone https://github.com/riptide-06/Gremlins
+cd Gremlins && uv sync
+claude mcp add gremlin -- uv run --directory $PWD mcp_server.py</pre></div>
+      </div>
+    </div>
+    <div id="nojudge" class="card" hidden style="background:var(--warn-bg)"><strong>Judge mode is not open.</strong> <span style="font-size:13px">Ask the team for the judge link, or sign in with your UCSC account above.</span></div>
+  </div>
+</section>
+
+<!-- 2. WELCOME -->
+<section id="s-welcome" class="screen" hidden>
+  <header class="top">
+    <a class="brand" href="#chat"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <div class="user"><span class="dot"></span><span class="mail js-mail">you</span><span class="tag js-tag">UCSC</span><button class="btn small js-logout" type="button">Log out</button></div>
+  </header>
+  <div class="wrap" style="max-width:820px">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:28px">
+      <div class="gslot" data-size="200" style="flex:0 0 200px"></div>
+      <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:10px">
+        <span class="pill" style="align-self:flex-start;background:var(--green)" id="welcome-pill">CONNECTED</span>
+        <h1 style="font-size:clamp(30px,4vw,38px);line-height:1.1;font-weight:800" id="welcome-title">Your cubby is ready.</h1>
+        <p style="font-size:16px">That all happened inside your UCSC Google account. This site never saw your password.</p>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px" id="welcome-cards"></div>
+    <div class="card lift" style="background:var(--panel);display:flex;flex-direction:column;gap:10px">
+      <strong>Who may hear from your gremlin?</strong>
+      <span class="muted" style="font-size:13px">Each office answers from its own policy box and sees only the fields you allow in <a href="#cubby">My Cubby</a>. None of them can read your cubby.</span>
+      <div class="row" id="welcome-depts"></div>
+    </div>
+    <div class="row"><a class="btn primary" href="#chat" style="font-size:16px;min-height:50px;padding:13px 20px">Open my gremlin</a><a class="btn" href="#cubby">Look inside the cubby first</a></div>
+  </div>
+</section>
+
+<!-- 3. APP SHELL (chat) -->
+<section id="s-app" class="screen" hidden>
+  <header class="top">
+    <a class="brand" href="#chat"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <nav class="nav" aria-label="Primary"><a href="#chat" class="on">Chat</a><a href="#byoa">Bring your own agent</a><a href="#cubby">My Cubby</a></nav>
+    <div class="user"><span class="dot"></span><span class="mail js-mail">you</span><span class="tag js-tag">UCSC</span><button class="btn small js-logout" type="button">Log out</button></div>
+  </header>
+  <div class="shell">
+    <aside class="side" aria-label="Chats">
+      <button class="btn primary" id="new-chat" type="button"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 4v12M4 10h12" stroke="#151515" stroke-width="2.5" stroke-linecap="round" fill="none"></path></svg>New chat</button>
+      <div class="list" id="recent"><span class="eyebrow" style="padding:0 6px">RECENT</span></div>
+      <div style="flex:1 1 auto"></div>
+      <a class="cubbycard" href="#cubby">
+        <span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:800"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2" fill="#E8B86D" stroke="#151515" stroke-width="1.5"></rect><rect x="3" y="8" width="18" height="4" fill="#F3CF8C" stroke="#151515" stroke-width="1.5"></rect><rect x="8" y="9.5" width="8" height="1.6" rx=".8" fill="#151515"></rect></svg>My Cubby</span>
+        <span class="muted" id="cubby-summary">loading</span>
+        <span class="muted" id="cubby-writers"></span>
+        <span style="font-weight:600">They can write here. They can't read it.</span>
+      </a>
+    </aside>
+
+    <main class="main">
+      <div class="mainhead">
+        <div><div style="font-size:16px;font-weight:800">Your gremlin</div><div class="muted" style="font-size:12px">reading from My Cubby · every answer cites its source · your name never leaves</div></div>
+        <div class="row" id="dept-chips"></div>
+      </div>
+
+      <div class="view" id="v-empty">
+        <div class="thread" style="align-items:center;justify-content:center;gap:18px;max-width:760px">
+          <div class="gslot" data-size="220"></div>
+          <h1 style="font-size:28px;font-weight:800;text-align:center" id="empty-title">What's going on?</h1>
+          <p class="muted" style="text-align:center">Ask about your own situation. I'll check with the right offices and tell you who decides. Try one of these, or type your own.</p>
+          <div class="grid2" style="width:100%">
+            <a class="card lift q-card" data-q="Can I drop my 5-unit GE and go from 17 to 12 units?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">UNITS</span><span style="font-weight:600;font-size:14px">Can I drop my 5-unit GE and go from 17 to 12 units?</span></a>
+            <a class="card lift q-card" data-q="My college adviser approved me to take 10 units this quarter, so I can drop to 10, right?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">WHO DECIDES</span><span style="font-weight:600;font-size:14px">My college adviser approved 10 units, so I can drop to 10, right?</span></a>
+            <a class="card lift q-card" data-q="Can I take a second on-campus job, 12 more hours a week?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">WORK HOURS</span><span style="font-weight:600;font-size:14px">Can I take a second on-campus job, 12 more hours a week?</span></a>
+            <a class="card lift q-card" data-q="Should I add CMPM 120 now and go to 22 units, or wait until next year?" style="text-decoration:none;color:var(--ink);display:flex;flex-direction:column;gap:4px;padding:14px;box-shadow:3px 3px 0 var(--line)"><span class="eyebrow">TWO ADVISERS</span><span style="font-weight:600;font-size:14px">Should I add CMPM 120 now and go to 22 units, or wait?</span></a>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="v-thread" hidden>
+        <div class="thread" id="thread"></div>
+      </div>
+
+      <div class="composer">
+        <form class="in" id="composer">
+          <div style="display:flex;gap:10px;align-items:center">
+            <label for="ask-input" class="vis">Ask your gremlin</label>
+            <input id="ask-input" type="text" placeholder="Ask about your situation. Try: can I travel home in December?" autocomplete="off">
+            <button class="send" type="submit" aria-label="Send" id="send"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12h14M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--on-blue)"></path></svg></button>
+          </div>
+          <span class="muted" style="font-size:12px" id="composer-note">Your gremlin only reads your cubby with your login. Departments get your question plus the fields you allowed, never your name.</span>
+        </form>
+      </div>
+    </main>
+
+    <aside class="panel" aria-label="Bring your own agent">
+      <div class="gslot" data-size="170" style="align-self:center"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;text-align:center"><strong>Meet your gremlin</strong><span class="muted" style="font-size:13px">It sits on your cubby. It reads it with your login, asks the departments, and never hands out your name.</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <strong>Bring your own agent</strong>
+        <span style="font-size:13px">This chat is one way in. Any agent you already use can talk to the same gremlin, with the same cubby and the same rules.</span>
+        <div class="step"><span class="num" style="background:var(--yellow)">1</span>Claude Desktop or Claude Code, as an MCP server</div>
+        <div class="step"><span class="num" style="background:var(--green)">2</span>A local model on your laptop</div>
+        <div class="step"><span class="num" style="background:var(--sky)">3</span>Any MCP client, with your Campus Cubbies token</div>
+        <a class="btn lift" href="#byoa" style="align-self:flex-start">See the setup steps</a>
+      </div>
+      <div class="card" style="background:var(--bg);display:flex;flex-direction:column;gap:6px;padding:12px"><span class="eyebrow">TOOLS YOUR AGENT GETS</span><div class="row"><span class="chip" style="background:var(--card)">ask</span><span class="chip" style="background:var(--card)">my_box</span><span class="chip" style="background:var(--card)">approve_share</span><span class="chip" style="background:var(--card)">open_items</span></div></div>
+      <div class="card" style="display:flex;flex-direction:column;gap:6px;padding:12px;font-size:12px"><span class="eyebrow">HOW AN ANSWER IS MADE</span><span>1. Your gremlin reads your cubby. 2. It sends each office only the fields you allowed. 3. Each office answers from its own policy box and cites it. 4. Code checks every citation and applies precedence. 5. Agree, disagree, escalate, or ask you.</span></div>
+      <span class="muted" style="font-size:11px">Prototype. Synthetic data only. UCSC accounts only.</span>
+    </aside>
+  </div>
+</section>
+
+<!-- 5. BRIEF -->
+<section id="s-brief" class="screen" hidden>
+  <header class="top">
+    <a class="brand" href="#chat"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <nav class="nav" aria-label="Primary"><a href="#chat">Chat</a><a href="#byoa">Bring your own agent</a><a href="#cubby">My Cubby</a></nav>
+    <div class="user"><span class="dot"></span><span class="mail js-mail">you</span><span class="tag js-tag">UCSC</span><button class="btn small js-logout" type="button">Log out</button></div>
+  </header>
+  <div class="wrap" style="max-width:820px" id="brief-wrap">
+    <div class="card"><strong>No brief yet.</strong> <span class="muted">Ask something that escalates or disputes and it shows up here.</span></div>
+    <div class="row"><a class="btn primary" href="#chat">Back to the chat</a></div>
+  </div>
+</section>
+
+<!-- 6. CUBBY -->
+<section id="s-cubby" class="screen" hidden>
+  <header class="top">
+    <a class="brand" href="#chat"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <nav class="nav" aria-label="Primary"><a href="#chat">Chat</a><a href="#byoa">Bring your own agent</a><a href="#cubby" class="on">My Cubby</a></nav>
+    <div class="user"><span class="dot"></span><span class="mail js-mail">you</span><span class="tag js-tag">UCSC</span><button class="btn small js-logout" type="button">Log out</button></div>
+  </header>
+  <div class="wrap">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:24px">
+      <div class="gslot" data-size="150"></div>
+      <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:8px">
+        <h1 style="font-size:clamp(28px,4vw,36px);font-weight:800">My Cubby</h1>
+        <p class="muted">Email tells you what people said. This tells you what's true right now, who's responsible for it, and what's waiting on you. Your gremlin keeps it as one file in your Drive folder; only your gremlin reads it.</p>
+        <div class="row" id="cubby-chips"></div>
+      </div>
+    </div>
+    <div class="grid2" style="gap:16px">
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <strong>About me</strong>
+        <span class="muted" style="font-size:12px">Your gremlin reads these; departments only get the ones you allow. Click a value to change it, then ask the same question again.</span>
+        <div class="tscroll" style="box-shadow:none"><table id="profile-table"><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <strong>Who gets what</strong>
+        <span class="muted" style="font-size:12px">The policy wall. Change any cell. <em>Ask</em> means your gremlin checks with you first; <em>never</em> cannot be approved.</span>
+        <div class="tscroll" style="box-shadow:none"><table id="perm-table"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span class="eyebrow">WHAT YOUR GREMLIN WROTE · append only, newest last, pointers only in the logs</span>
+      <div class="tscroll"><table class="ledger" id="ledger"><thead><tr><th>When</th><th>Kind</th><th>Entry</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="grid2" style="gap:16px">
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <strong>What left, to whom</strong>
+        <span class="muted" style="font-size:12px">Pointers only. The content of a question is never logged here.</span>
+        <div style="display:flex;flex-direction:column;gap:6px" class="mono" id="shared-log"></div>
+      </div>
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <strong>Waiting on you</strong>
+        <span class="muted" style="font-size:12px">Questions that stopped because a department needed a field you hadn't released.</span>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px" id="open-items">none</div>
+      </div>
+    </div>
+    <details class="card"><summary style="cursor:pointer;font-weight:600">The raw file (gremlin-student.md)</summary><pre class="code" id="box-raw" style="margin-top:10px;max-height:50vh;overflow:auto"></pre></details>
+    <div class="row"><a class="btn primary" href="#chat">Back to my gremlin</a><a class="btn" id="folder-link" href="#" target="_blank" rel="noopener" hidden>Open the folder in Drive</a><a class="btn" href="#byoa">Connect my own agent</a></div>
+  </div>
+</section>
+
+<!-- 7. BRING YOUR OWN AGENT -->
+<section id="s-byoa" class="screen" hidden>
+  <header class="top">
+    <a class="brand" href="#chat"><span class="logo-slot"></span><span><b>gremlin labs</b><small>by bayleaf · built on Campus Cubbies</small></span></a>
+    <nav class="nav" aria-label="Primary"><a href="#chat">Chat</a><a href="#byoa" class="on">Bring your own agent</a><a href="#cubby">My Cubby</a></nav>
+    <div class="user"><span class="dot"></span><span class="mail js-mail">you</span><span class="tag js-tag">UCSC</span><button class="btn small js-logout" type="button">Log out</button></div>
+  </header>
+  <div class="wrap">
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:640px">
+      <h1 style="font-size:clamp(28px,4vw,36px);font-weight:800">Bring your own agent</h1>
+      <p class="muted">The chat on this site is one way in. Any agent you already use can talk to your gremlin. Same cubby, same wall, same citations. Three ways, pick one.</p>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px;border:1.5px solid var(--line);border-radius:14px;background:var(--panel)">
+      <span class="card" style="padding:10px 14px;font-weight:800;font-size:13px">your agent</span>
+      <svg viewBox="0 0 40 20" width="40" height="20" aria-hidden="true"><path d="M2 10h30M26 4l8 6-8 6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span class="card" style="padding:10px 14px;font-weight:800;font-size:13px;background:var(--green);color:#151515">your gremlin</span>
+      <svg viewBox="0 0 40 20" width="40" height="20" aria-hidden="true"><path d="M2 10h30M26 4l8 6-8 6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span class="card" style="padding:10px 14px;font-weight:800;font-size:13px;background:var(--yellow);color:#151515">the wall</span>
+      <svg viewBox="0 0 40 20" width="40" height="20" aria-hidden="true"><path d="M2 10h30M26 4l8 6-8 6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span id="byoa-depts" class="row"></span>
+      <span class="muted" style="font-size:12px;flex-basis:100%">Your gremlin reads your cubby with your login. The wall strips everything a department isn't allowed to see and checks every citation on the way back. Gremlin to gremlin runs over A2A, with SLIM transport where a node is up.</span>
+    </div>
+    <div class="grid3">
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <div class="row"><span class="num" style="background:var(--yellow)">1</span><strong>Claude Desktop or Claude Code</strong></div>
+        <span style="font-size:13px">Pair your agent with Campus Cubbies first (its guide is at <a id="skill-link" href="#" target="_blank" rel="noopener">cubby.bayleaf.dev/SKILL.md</a>); that gives it a private token. Then add this server with the token as the bearer.</span>
+        <pre class="code" id="mcp-config">{"mcpServers": {"gremlin": {"url": ".../mcp"}}}</pre>
+        <span class="muted" style="font-size:12px">Then ask Claude: "Using the gremlin tools, can I drop to 12 units this quarter?"</span>
+      </div>
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <div class="row"><span class="num" style="background:var(--green)">2</span><strong>A local model or any MCP client</strong></div>
+        <span style="font-size:13px">Run the gremlin on your own laptop. Your cubby stays in your Drive; set the two variables and it reads it from there.</span>
+        <pre class="code">git clone https://github.com/riptide-06/Gremlins
+cd Gremlins && uv sync
+export CUBBY_URL=https://cubby.bayleaf.dev CUBBY_TOKEN=...
+BOX_STORE=cubby uv run mcp_server.py    # stdio</pre>
+        <span class="muted" style="font-size:12px">Works with any MCP-capable client, including local models.</span>
+      </div>
+      <div class="card lift" style="display:flex;flex-direction:column;gap:10px">
+        <div class="row"><span class="num" style="background:var(--sky)">3</span><strong>Talk to a department directly (A2A)</strong></div>
+        <span style="font-size:13px">Every department gremlin is an A2A 1.0 agent with skill <code>answer</code>. Discover the card, send the question and the context you choose to share.</span>
+        <pre class="code">uv run dept_gremlin.py serve --dept iso --port 10001
+GET /.well-known/agent-card.json
+SendMessage {"session_id","question","context"}</pre>
+        <span class="muted" style="font-size:12px">Stateless. Every claim cites a box id. Escalation is decided in code.</span>
+      </div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:8px;background:var(--bg)">
+      <span class="eyebrow">TOOLS YOUR AGENT GETS</span>
+      <div class="grid2" style="gap:8px;font-size:13px">
+        <div><span class="chip" style="background:var(--card)">ask</span> &nbsp;ask a question; your gremlin does the rest</div>
+        <div><span class="chip" style="background:var(--card)">my_box</span> &nbsp;read your own cubby, current state only</div>
+        <div><span class="chip" style="background:var(--card)">approve_share</span> &nbsp;allow one field for one department</div>
+        <div><span class="chip" style="background:var(--card)">open_items</span> &nbsp;things waiting on you</div>
+      </div>
+    </div>
+    <div class="row"><a class="btn primary" href="#chat">Back to my gremlin</a><a class="btn" href="#cubby">See my cubby</a></div>
+  </div>
+</section>
+
+<script>
+(function(){
+  'use strict';
+  // ---- decorations: gremlins and logos --------------------------------------------
+  var gt = document.getElementById('tpl-gremlin').content.firstElementChild;
+  document.querySelectorAll('.gslot').forEach(function(slot){
+    var s = gt.cloneNode(true); var w = parseInt(slot.getAttribute('data-size') || '200', 10);
+    s.setAttribute('width', w); s.setAttribute('height', Math.round(w * 280 / 260)); s.style.maxWidth = '100%'; slot.appendChild(s);
+  });
+  var lt = document.getElementById('tpl-logo').content.firstElementChild;
+  document.querySelectorAll('.logo-slot').forEach(function(slot){ slot.appendChild(lt.cloneNode(true)); });
+
+  // ---- state ----------------------------------------------------------------------
+  var state = { me: null, box: null, thread: [], lastBrief: null, pollTimer: null, busy: false, interval: 5 };
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function cites(list){ return (list || []).map(function(c){ return '<span class="cite">' + esc(c) + '</span>'; }).join(' '); }
+  function withCites(text){ return esc(text).replace(/\[([FPQE]-\d+)\]/g, '<span class="cite">$1</span>'); }
+  function deptName(id){ var d = state.me && state.me.departments; return (d && d[id]) ? d[id] : String(id || '').toUpperCase(); }
+  function shortDept(id){ return String(id || '').toUpperCase(); }
+  function api(path, body){
+    var opt = { headers: {'X-Gremlin': '1', 'Content-Type': 'application/json'}, credentials: 'same-origin' };
+    if (body !== undefined) { opt.method = 'POST'; opt.body = JSON.stringify(body); }
+    return fetch(path, opt).then(function(r){ return r.json().then(function(j){ j.__status = r.status; return j; }); });
+  }
+
+  // ---- routing --------------------------------------------------------------------
+  var screens = { signin: 's-signin', how: 's-signin', 'byoa-public': 's-signin', nojudge: 's-signin', welcome: 's-welcome', chat: 's-app', brief: 's-brief', cubby: 's-cubby', byoa: 's-byoa' };
+  var needsAuth = { welcome: 1, chat: 1, brief: 1, cubby: 1, byoa: 1 };
+  function go(){
+    var key = (location.hash || '#signin').slice(1);
+    if (!screens[key]) key = 'signin';
+    var connected = state.me && state.me.connected;
+    if (needsAuth[key] && !connected) key = 'signin';
+    if (!needsAuth[key] && connected && key === 'signin') key = 'chat';
+    var id = screens[key];
+    document.querySelectorAll('.screen').forEach(function(el){ el.hidden = el.id !== id; });
+    $('nojudge').hidden = key !== 'nojudge';
+    if (key === 'how' || key === 'byoa-public') { var h = $(key); if (h) { h.scrollIntoView({block: 'start'}); return; } }
+    if (key === 'cubby') renderCubby();
+    if (key === 'brief') renderBrief();
+    if (key === 'chat') { $('v-empty').hidden = state.thread.length > 0; $('v-thread').hidden = state.thread.length === 0; }
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', go);
+
+  // ---- identity --------------------------------------------------------------------
+  function paintIdentity(){
+    var me = state.me || {};
+    document.querySelectorAll('.js-mail').forEach(function(el){ el.textContent = me.identity || 'you'; });
+    document.querySelectorAll('.js-tag').forEach(function(el){ el.textContent = me.demo ? 'DEMO' : 'UCSC'; el.style.background = me.demo ? 'var(--yellow)' : 'var(--blue)'; el.style.color = me.demo ? '#151515' : 'var(--on-blue)'; });
+    $('demo-banner').hidden = !me.demo;
+    var url = me.public_url || location.origin;
+    var cfg = JSON.stringify({mcpServers: {gremlin: {url: url + '/mcp', headers: {Authorization: 'Bearer <your Campus Cubbies token>'}}}}, null, 2);
+    $('mcp-config').textContent = cfg; $('mcp-config-public').textContent = cfg;
+    $('skill-link').href = (me.cubby_url || 'https://cubby.bayleaf.dev') + '/SKILL.md';
+    var chips = Object.keys(me.departments || {}).map(function(d){ return '<span class="chip">' + esc(shortDept(d)) + ' gremlin · A2A</span>'; }).join('');
+    $('dept-chips').innerHTML = chips;
+    $('byoa-depts').innerHTML = Object.keys(me.departments || {}).map(function(d){ return '<span class="card" style="padding:10px 14px;font-weight:800;font-size:13px">' + esc(shortDept(d)) + ' gremlin</span>'; }).join('');
+    $('welcome-depts').innerHTML = Object.keys(me.departments || {}).map(function(d){ return '<span class="pill" style="background:var(--green);letter-spacing:0;font-weight:600;font-size:13px">' + esc(me.departments[d]) + '</span>'; }).join('');
+    $('empty-title').textContent = me.demo ? 'Hi Asha. What\'s going on?' : 'Hi' + (me.identity ? ' ' + me.identity.split('@')[0] : '') + '. What\'s going on?';
+    if (me.folder_url) { $('folder-link').href = me.folder_url; $('folder-link').hidden = false; } else { $('folder-link').hidden = true; }
+  }
+  document.querySelectorAll('.js-logout').forEach(function(b){ b.onclick = function(){ api('/api/logout', {}).then(function(){ state.me = null; state.thread = []; state.box = null; location.hash = '#signin'; location.reload(); }); }; });
+
+  // ---- connect (Campus Cubbies pairing) ----------------------------------------------
+  function connectError(msg){ var e = $('connect-error'); e.textContent = msg; e.hidden = !msg; }
+  function stopPolling(){ if (state.pollTimer) { clearTimeout(state.pollTimer); state.pollTimer = null; } }
+  function showWait(on){ $('connect-idle').hidden = on; $('connect-wait').hidden = !on; }
+  function startConnect(){
+    connectError('');
+    $('connect-start').disabled = true;
+    api('/api/connect/start', {}).then(function(d){
+      $('connect-start').disabled = false;
+      if (d.error) { connectError(d.error); return; }
+      $('user-code').textContent = d.user_code;
+      $('approval-link').href = d.verification_uri_complete;
+      showWait(true);
+      state.interval = d.interval || 5;
+      window.open(d.verification_uri_complete, '_blank', 'noopener');
+      schedulePoll(state.interval);
+    }).catch(function(){ $('connect-start').disabled = false; connectError('Could not reach this server.'); });
+  }
+  function schedulePoll(seconds){ stopPolling(); state.pollTimer = setTimeout(pollOnce, seconds * 1000); }
+  function pollOnce(){
+    api('/api/connect/poll', {}).then(function(d){
+      if (d.status === 'connected') {
+        $('poll-status').textContent = 'Connected as ' + d.identity + '.';
+        return boot(true).then(function(){ renderWelcome(d); location.hash = '#welcome'; showWait(false); });
+      }
+      if (d.status === 'authorization_pending' || d.status === 'unavailable') {
+        $('poll-status').textContent = d.status === 'unavailable' ? 'Campus Cubbies is busy; trying again.' : 'Waiting for your approval in the Campus Cubbies tab.';
+        if (d.interval) state.interval = d.interval;
+        schedulePoll(state.interval); return;
+      }
+      showWait(false); connectError(d.error || ('Pairing stopped: ' + d.status));
+    }).catch(function(){ schedulePoll(8); });
+  }
+  $('connect-start').onclick = startConnect;
+  $('nav-signin').onclick = function(e){ e.preventDefault(); location.hash = '#signin'; startConnect(); };
+  $('poll-now').onclick = function(){ stopPolling(); pollOnce(); };
+  $('connect-cancel').onclick = function(){ stopPolling(); showWait(false); };
+
+  function renderWelcome(d){
+    var me = state.me || {};
+    $('welcome-title').textContent = (me.demo ? 'Hi Asha.' : 'Hi ' + ((me.identity || 'there').split('@')[0]) + '.') + ' Your cubby is ready.';
+    $('welcome-pill').textContent = d && d.created ? 'CONNECTED · FIRST TIME' : 'CONNECTED';
+    var ok = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#B9E5A6" stroke="#151515" stroke-width="1.5"></circle><path d="M7 12.5l3 3 7-7" fill="none" stroke="#151515" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+    var warn = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#F7A501" stroke="#151515" stroke-width="1.5"></circle><path d="M12 7v6M12 16.5v.5" fill="none" stroke="#151515" stroke-width="2.2" stroke-linecap="round"></path></svg>';
+    var cards = [];
+    cards.push('<div class="card" style="display:flex;align-items:center;gap:12px">' + ok + '<div><strong>Your My Cubby folder in UCSC Drive</strong><div class="muted" style="font-size:12px">' + (me.folder_url ? '<a href="' + esc(me.folder_url) + '" target="_blank" rel="noopener">Open it in Drive</a>. ' : '') + 'Owned by you. Campus Cubbies manages who may write to it.</div></div></div>');
+    cards.push('<div class="card" style="display:flex;align-items:center;gap:12px">' + ok + '<div><strong>' + (d && d.created ? 'Created gremlin-student.md in it' : 'Found gremlin-student.md in it') + '</strong><div class="muted" style="font-size:12px;font-family:var(--mono)">name and email seeded · both marked never-share · everything else blank until you fill it in</div></div></div>');
+    cards.push('<div class="card" style="display:flex;align-items:center;gap:12px">' + warn + '<div><strong>Tell your gremlin about yourself once</strong><div class="muted" style="font-size:12px">Units, hours, visa, major: fill them in on <a href="#cubby">My Cubby</a>, or your gremlin will ask when a department needs one.</div></div></div>');
+    $('welcome-cards').innerHTML = cards.join('');
+  }
+
+  // ---- boot --------------------------------------------------------------------------
+  function boot(silent){
+    return api('/api/me').then(function(me){
+      state.me = me;
+      paintIdentity();
+      if (me.connected) return loadBox().then(function(){ if (!silent) go(); });
+      if (!silent) go();
+    }).catch(function(){ if (!silent) go(); });
+  }
+
+  // ---- the cubby (student box) ---------------------------------------------------------
+  function parseSections(text){
+    var out = {}; var cur = null;
+    String(text || '').split('\n').forEach(function(line){
+      var m = /^##\s+(\d+)\.\s*(.+?)\s*$/.exec(line);
+      if (m) { cur = parseInt(m[1], 10); out[cur] = {title: m[2], lines: []}; return; }
+      if (cur != null && line.trim() && !line.startsWith('#')) out[cur].lines.push(line);
+    });
+    return out;
+  }
+  function loadBox(){
+    return api('/api/box').then(function(d){
+      if (d.error) { state.box = null; $('cubby-summary').textContent = d.error; return; }
+      state.box = d; state.box.sections = parseSections(d.box);
+      var entries = [4,5,6,7,8].reduce(function(n, s){ return n + ((state.box.sections[s] || {lines: []}).lines.filter(function(l){ return l.indexOf('|') > 0; }).length); }, 0);
+      var open = (state.box.sections[8] || {lines: []}).lines.filter(function(l){ return l.indexOf('ASK_STUDENT') > 0; }).length;
+      $('cubby-summary').textContent = (d.location && d.location.indexOf('cubby:') === 0 ? 'UCSC Google Drive' : 'this server') + ' · ' + entries + ' entries' + (open ? ' · ' + open + ' waiting on you' : '');
+      $('cubby-writers').textContent = 'Departments: ' + (d.departments || []).join(', ');
+    });
+  }
+  function renderCubby(){
+    var b = state.box; if (!b) { return loadBox().then(function(){ if (state.box) renderCubby(); }); }
+    var fields = b.fields || {}; var perms = b.permissions || {}; var depts = b.departments || [];
+    $('cubby-chips').innerHTML = '<span class="chip">' + (b.location && b.location.indexOf('cubby:') === 0 ? 'in your Drive · ' + esc(b.location.slice(6)) : 'on this server') + '</span><span class="chip">readers: only your gremlin</span><span class="chip">writers: ' + esc(depts.join(', ')) + '</span>';
+    var pt = $('profile-table').querySelector('tbody'); pt.innerHTML = '';
+    var known = ['college','level','major','major_declared','quarter_number','units','hours','gpa','visa','rcl_on_file','first_quarter','final_quarter','expected_graduation','quarters_to_graduation','days_to_deadline','days_to_i20_end','aid','aid_type','part_time_program'];
+    var names = Object.keys(fields).filter(function(k){ return k !== 'name' && k !== 'email'; });
+    known.forEach(function(k){ if (names.indexOf(k) < 0) names.push(k); });
+    ['name','email'].forEach(function(k){ var tr = document.createElement('tr'); tr.innerHTML = '<td class="mono">' + k + '</td><td>' + esc(fields[k] || '') + ' <span class="muted" style="font-size:11px">never shared</span></td>'; pt.appendChild(tr); });
+    names.forEach(function(k){
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="mono">' + esc(k) + '</td><td><span class="val" style="cursor:pointer;border-bottom:1.5px dashed var(--line)" title="click to change">' + (fields[k] ? esc(fields[k]) : '<span class="muted">not set</span>') + '</span></td>';
+      tr.querySelector('.val').onclick = function(){
+        var td = this.parentNode; var cur = fields[k] || '';
+        td.innerHTML = '<input class="inline-edit" value="' + esc(cur) + '"> <button class="btn small" type="button">save</button>';
+        var inp = td.querySelector('input'); inp.focus();
+        var save = function(){ api('/api/set', {field: k, value: inp.value.trim()}).then(function(d){ if (d.error) alert(d.error); loadBox().then(renderCubby); }); };
+        td.querySelector('button').onclick = save; inp.onkeydown = function(e){ if (e.key === 'Enter') save(); };
+      };
+      pt.appendChild(tr);
+    });
+    var th = $('perm-table').querySelector('thead'); var tb = $('perm-table').querySelector('tbody');
+    th.innerHTML = '<tr><th>Field</th>' + depts.map(function(d){ return '<th>' + esc(d) + '</th>'; }).join('') + '</tr>'; tb.innerHTML = '';
+    Object.keys(perms).forEach(function(f){
+      var tr = document.createElement('tr'); var row = perms[f];
+      tr.innerHTML = '<td class="mono">' + esc(f) + '</td>' + depts.map(function(d){
+        var v = row[d] || 'never';
+        if (f === 'name' || f === 'email') return '<td>never</td>';
+        return '<td><select class="perm" data-f="' + esc(f) + '" data-d="' + esc(d) + '">' + ['yes','ask','no','never'].map(function(o){ return '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></td>';
+      }).join('');
+      tr.querySelectorAll('select').forEach(function(sel){ sel.onchange = function(){ api('/api/permission', {field: sel.dataset.f, dept: sel.dataset.d, value: sel.value}).then(function(d){ if (d.error) alert(d.error); loadBox(); }); }; });
+      tb.appendChild(tr);
+    });
+    var lb = $('ledger').querySelector('tbody'); lb.innerHTML = '';
+    var kinds = {4: 'LOG', 5: 'ANSWER', 6: 'BRIEF', 7: 'SHARED', 8: 'ASK'};
+    var klass = {CONVERGED: 'v-ok', DISPUTED: 'v-dis', ESCALATED: 'v-esc', ASK_STUDENT: 'v-ask', SESSION: 'v-un', SHARED: 'v-un', APPROVED: 'v-ok'};
+    var rows = [];
+    [5,6,8,7,4].forEach(function(s){ ((b.sections[s] || {lines: []}).lines).forEach(function(l){ var c = l.split('|').map(function(x){ return x.trim(); }); if (c.length > 1) rows.push({ts: c[0], kind: c[1], rest: c.slice(2).join(' · '), section: s}); }); });
+    rows.sort(function(a, z){ return a.ts < z.ts ? 1 : -1; });
+    if (!rows.length) lb.innerHTML = '<tr><td colspan="3" class="muted">Nothing yet. Ask your gremlin something.</td></tr>';
+    rows.forEach(function(r){ var tr = document.createElement('tr'); tr.innerHTML = '<td class="mono">' + esc(r.ts.replace('T', ' ').slice(0, 16)) + '</td><td><span class="verdict ' + (klass[r.kind] || 'v-un') + '" style="font-size:10px">' + esc(r.kind) + '</span></td><td style="font-size:12.5px">' + esc(r.rest) + '</td>'; lb.appendChild(tr); });
+    var shared = ((b.sections[7] || {lines: []}).lines).map(function(l){ var c = l.split('|').map(function(x){ return x.trim(); }); return c[1] === 'SHARED' ? (c[4] || '') + ' · ' + shortDept(c[2]) + ' · ' + (c[3] || '') : (c[1] === 'APPROVED' ? 'approved ' + c[2] + ' for ' + shortDept(c[3]) : ''); }).filter(Boolean);
+    $('shared-log').innerHTML = shared.length ? shared.reverse().map(function(s){ return '<span>' + esc(s) + '</span>'; }).join('') : '<span class="muted">nothing has left your cubby yet</span>';
+    api('/api/open_items').then(function(items){ $('open-items').innerHTML = (items && items.length) ? items.map(function(i){ return '<div><span class="chip">' + esc(shortDept(i.dept)) + '</span> needs <strong>' + esc((i.fields || []).join(', ')) + '</strong> for: ' + esc(i.question) + '</div>'; }).join('') : 'none'; });
+    $('box-raw').textContent = b.box || '';
+  }
+
+  // ---- chat ---------------------------------------------------------------------------
+  function verdictClass(k){ return {CONVERGED: 'v-ok', DISPUTED: 'v-dis', ESCALATED: 'v-esc', ASK_STUDENT: 'v-ask', UNANSWERED: 'v-un'}[k] || 'v-un'; }
+  function subline(v){
+    var asked = Object.keys(v.shared || {});
+    if (v.verdict === 'CONVERGED') return (asked.length ? asked.map(shortDept).join(', ') + ' answered' : 'answered') + (v.authority ? ' · ' + v.authority + ' rule decides' : '') + (v.brief && v.brief.precedence ? ' · precedence applied' : '');
+    if (v.verdict === 'DISPUTED') return 'two offices disagree at equal authority · the disagreement is kept';
+    if (v.verdict === 'ESCALATED') return 'a trigger matched in code · a human decides';
+    if (v.verdict === 'ASK_STUDENT') return 'asking you first · nothing extra was shared';
+    return 'no department covers this · nothing was invented';
+  }
+  function receipt(v){
+    var parts = Object.keys(v.shared || {}).map(function(d){ var f = v.shared[d] || []; return 'Shared with ' + shortDept(d) + ': ' + (f.length ? f.join(', ') : 'nothing'); });
+    if (v.dropped) parts.push('the wall deleted ' + v.dropped + ' uncited claim' + (v.dropped > 1 ? 's' : '') + ' before you saw this');
+    var wrote = (v.written || []).map(function(w){ return w.section; }).filter(function(s, i, a){ return a.indexOf(s) === i; });
+    if (wrote.length) parts.push('logged to your cubby, section ' + wrote.join(', '));
+    return parts.join(' · ');
+  }
+  function renderReply(v, question){
+    var html = '<div class="row"><span class="verdict ' + verdictClass(v.verdict) + '">' + esc(v.verdict === 'ASK_STUDENT' ? 'ASKING YOU FIRST' : v.verdict) + '</span><span class="muted" style="font-size:12px">' + esc(subline(v)) + '</span></div>';
+    if (v.verdict === 'ASK_STUDENT') {
+      var asks = []; Object.keys(v.ask_by_dept || {}).forEach(function(d){ (v.ask_by_dept[d] || []).forEach(function(f){ asks.push({d: d, f: f}); }); });
+      var val = function(f){ return state.box && state.box.fields && state.box.fields[f]; };
+      html += '<p>' + asks.map(function(a){ return shortDept(a.d) + ' can answer this, but it needs <span class="cite">' + esc(a.f) + '</span>' + (val(a.f) ? ', which your cubby marks ask-before-sharing (it says ' + esc(val(a.f)) + ')' : ', which is not in your cubby yet') + '.'; }).join(' ') + ' Share it for this question?</p>';
+      html += '<div class="mini"><span class="eyebrow">WHAT WOULD LEAVE YOUR CUBBY</span><span>' + asks.map(function(a){ return esc(a.f) + (val(a.f) ? ': ' + esc(val(a.f)) : ' (you type it in on My Cubby first)') + ' to ' + shortDept(a.d); }).join(' · ') + ' · never: name, email</span></div>';
+      html += '<div class="row">' + asks.map(function(a){ return val(a.f) ? '<button class="btn primary act-approve" data-f="' + esc(a.f) + '" data-d="' + esc(a.d) + '" style="box-shadow:3px 3px 0 var(--line)">Yes, share ' + esc(a.f) + ' with ' + esc(shortDept(a.d)) + '</button>' : '<a class="btn primary" href="#cubby" style="box-shadow:3px 3px 0 var(--line)">Add ' + esc(a.f) + ' to my cubby</a>'; }).join('') + '<button class="btn act-decline" data-fields="' + esc(asks.map(function(a){ return a.f; }).join(',')) + '">No, answer without it</button></div>';
+    } else {
+      if (v.answer) html += '<p>' + withCites(v.answer) + '</p>';
+      if (v.verdict === 'UNANSWERED') html += '<p>None of the departments covers this, so I\'m not going to make something up. Try a question about units, work, aid, or your major.</p>';
+      var b = v.brief || {};
+      if (b.disputed && b.disputed.length) html += '<div class="grid2">' + b.disputed.map(function(d){ var halves = d.split(' vs '); return halves.map(function(h){ var m = /^([A-Z]+) \(([a-z]*)\): (.*)$/.exec(h); return '<div class="mini"><span class="eyebrow">' + (m ? esc(m[1]) + ' SAYS · ' + esc(m[2].toUpperCase() || 'UNRANKED') : 'POSITION') + '</span><span>' + esc(m ? m[3] : h) + '</span></div>'; }).join(''); }).join('') + '</div>';
+      if (v.verdict === 'DISPUTED') html += '<div class="why"><strong style="font-size:12px">Why this is disputed, not averaged</strong><span>Both positions rest on rules of the same rank, so no precedence applies. Both are kept in your cubby. ' + (b.decides && b.decides.length ? 'Who decides: you, with ' + esc(b.decides.join(' and ')) + '.' : '') + '</span></div>';
+      if (v.verdict === 'ESCALATED') html += '<div class="why"><strong style="font-size:12px">Why a person has to look at this</strong><span>' + esc((b.resolve || []).join(' ') || 'A trigger in the policy box matched your situation.') + (b.decides && b.decides.length ? ' Decides: ' + esc(b.decides.join(', ')) + '.' : '') + '</span></div>';
+      if (v.verdict === 'CONVERGED' && b.precedence && b.precedence.length) html += '<div class="why"><strong style="font-size:12px">Precedence applied</strong><span>' + esc(b.precedence.join('; ')) + (b.agreed && b.agreed.length ? ' ' + esc(b.agreed.join('; ')) : '') + '</span></div>';
+      if (v.options && v.options.length) html += '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px"><strong style="font-size:12px">Your options, ranked by your preferences</strong>' + v.options.map(function(o){ var attrs = ['units','hours','weeks'].filter(function(k){ return o[k] != null; }).map(function(k){ return k + ' ' + o[k]; }).join(', '); return '<span>' + o.rank + '. ' + esc(o.option) + ' <span class="chip">' + esc(shortDept(o.dept)) + '</span> ' + cites(o.cites) + (attrs ? ' <span class="muted">(' + esc(attrs) + ')</span>' : '') + (o.conditions && o.conditions.length ? '<div class="muted" style="font-size:12px">if: ' + esc(o.conditions.join('; ')) + '</div>' : '') + '</span>'; }).join('') + '</div>';
+      if (v.escalations && v.escalations.length) html += '<span class="receipt">triggers fired in code: ' + cites(v.escalations) + '</span>';
+    }
+    html += '<span class="receipt">' + esc(receipt(v)) + '</span>';
+    var actions = [];
+    if (v.verdict === 'ESCALATED' || v.verdict === 'DISPUTED') actions.push('<a class="btn primary" href="#brief" style="box-shadow:3px 3px 0 var(--line)">Open the brief</a>');
+    if (v.verdict !== 'ASK_STUDENT') actions.push('<a class="btn" href="#cubby">See what was logged</a>');
+    if (actions.length) html += '<div class="row">' + actions.join('') + '</div>';
+    return html;
+  }
+  function addBubble(cls, text){ var el = document.createElement('div'); el.className = 'me'; if (cls) el.style.background = cls; el.textContent = text; $('thread').appendChild(el); return el; }
+  function addReply(html){ var g = document.createElement('div'); g.className = 'grem'; g.innerHTML = '<span class="av logo-slot"></span><div class="reply">' + html + '</div>'; g.querySelector('.logo-slot').appendChild(lt.cloneNode(true)); $('thread').appendChild(g); window.scrollTo(0, document.body.scrollHeight); return g; }
+  function ask(question, declined, note){
+    if (state.busy || !question) return;
+    state.busy = true; $('send').disabled = true;
+    location.hash = '#chat'; $('v-empty').hidden = true; $('v-thread').hidden = false;
+    if (note) addBubble(note.color, note.text); else { addBubble(null, question); state.thread.push(question); paintRecent(); }
+    var pending = addReply('<div class="row"><span class="spin"></span><span class="muted" style="font-size:12px">asking the departments through the wall</span></div>');
+    api('/api/ask', {question: question, declined: declined || []}).then(function(v){
+      pending.remove();
+      if (v.error) { addReply('<div class="row"><span class="verdict v-esc">ERROR</span></div><p>' + esc(v.error) + '</p>'); return; }
+      var g = addReply(renderReply(v, question));
+      if (v.verdict === 'ESCALATED' || v.verdict === 'DISPUTED') state.lastBrief = {v: v, q: question};
+      g.querySelectorAll('.act-approve').forEach(function(b){ b.onclick = function(){ api('/api/approve', {field: b.dataset.f, dept: b.dataset.d}).then(function(){ loadBox(); ask(question, [], {color: 'var(--green)', text: 'Yes, share ' + b.dataset.f + ' with ' + shortDept(b.dataset.d) + ' for this question.'}); }); }; });
+      g.querySelectorAll('.act-decline').forEach(function(b){ b.onclick = function(){ ask(question, b.dataset.fields.split(','), {color: 'var(--card)', text: 'No, answer without it.'}); }; });
+      loadBox();
+    }).catch(function(){ pending.remove(); addReply('<p class="err">This server did not answer. Try again.</p>'); }).then(function(){ state.busy = false; $('send').disabled = false; });
+  }
+  function paintRecent(){
+    var el = $('recent'); el.innerHTML = '<span class="eyebrow" style="padding:0 6px">RECENT</span>';
+    state.thread.slice().reverse().forEach(function(q){ var a = document.createElement('a'); a.href = '#chat'; a.textContent = q.length > 42 ? q.slice(0, 40) + '…' : q; a.title = q; el.appendChild(a); });
+  }
+  $('composer').addEventListener('submit', function(e){ e.preventDefault(); var v = $('ask-input').value.trim(); $('ask-input').value = ''; ask(v); });
+  document.querySelectorAll('.q-card').forEach(function(c){ c.addEventListener('click', function(e){ e.preventDefault(); ask(c.dataset.q); }); });
+  $('new-chat').onclick = function(){ state.thread = []; $('thread').innerHTML = ''; paintRecent(); location.hash = '#chat'; go(); };
+  $('reset-demo').onclick = function(){ api('/api/reset', {}).then(function(d){ if (d.ok) { state.thread = []; $('thread').innerHTML = ''; paintRecent(); state.lastBrief = null; loadBox().then(go); } else alert(d.error || 'not reset'); }); };
+
+  // ---- brief ---------------------------------------------------------------------------
+  function renderBrief(){
+    var w = $('brief-wrap');
+    if (!state.lastBrief) { w.innerHTML = '<div class="card"><strong>No brief yet.</strong> <span class="muted">Ask something that escalates or disputes and it shows up here.</span></div><div class="row"><a class="btn primary" href="#chat">Back to the chat</a></div>'; return; }
+    var v = state.lastBrief.v, b = v.brief || {};
+    var ctx = Object.keys(v.shared || {}).map(function(d){ return shortDept(d) + ': ' + ((v.shared[d] || []).join(', ') || 'nothing'); }).join(' · ');
+    var block = function(label, body, color){ return body ? '<div style="display:flex;flex-direction:column;gap:4px"><span class="eyebrow"' + (color ? ' style="color:' + color + '"' : '') + '>' + label + '</span><span>' + body + '</span></div>' : ''; };
+    w.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px"><div class="row"><span class="verdict ' + verdictClass(v.verdict) + '">' + esc(v.verdict) + '</span><span class="muted" style="font-size:12px">' + esc(b.decides && b.decides.length ? 'decides: ' + b.decides.join(', ') : 'written by your gremlin') + '</span></div><h1 style="font-size:clamp(28px,4vw,36px);font-weight:800">' + (v.verdict === 'DISPUTED' ? 'Two positions, kept' : 'Escalation brief') + '</h1><p class="muted">One screen for the human. Written by your gremlin from the departments\' answers, with every claim cited. Your name isn\'t on it.</p></div>'
+      + '<div class="card lift" style="display:flex;flex-direction:column;gap:14px;padding:20px">'
+      + block('QUESTION', esc(state.lastBrief.q))
+      + block('AGREED', esc((b.agreed || []).join(' · ')), '#2E9E4F')
+      + block('DISPUTED', esc((b.disputed || []).join(' · ')), 'var(--orange)')
+      + block('PRECEDENCE', esc((b.precedence || []).join('; ')))
+      + block('OPTIONS', (b.options || []).map(function(o, i){ return String.fromCharCode(97 + i) + '. ' + esc(o); }).join('<br>'))
+      + block('WHAT WOULD RESOLVE IT', esc((b.resolve || []).join(' · ')))
+      + block('TRIGGERS', cites(v.escalations))
+      + block('CITED', cites(v.cites))
+      + block('CONTEXT THE ADVISOR RECEIVES', '<span class="muted" style="font-size:13px">' + esc(ctx) + '. Not included: name, email, or any field marked no or never. The student is identified by the appointment, not by this brief.</span>')
+      + '</div><div class="row"><a class="btn primary" href="#cubby">Open my cubby</a><a class="btn" href="#chat">Back to the chat</a></div>';
+  }
+
+  boot(false);
+})();
+</script>
+</html>

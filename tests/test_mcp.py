@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock
 from advocate import Advocate, DeptGremlin, in_process
 from box import MarkdownBoxStore
 from brain import ScriptedBrain
-from gremlin_app import Settings, create_app, student_box_name
 from conftest import good_answer
 from mcp_server import build_mcp
 
@@ -74,67 +73,4 @@ async def test_no_signed_in_student_is_an_error():
         await mcp.call_tool("open_items", {})
 
 
-# ---- gremlin_app route --------------------------------------------------------
-from test_gremlin_app import TestStore, claims, sign_in  # noqa: E402  (same fake store and OIDC claims)
-
-
-@pytest.fixture
-def cloud(tmp_path, store):
-    fake = TestStore()
-    settings = Settings(url="http://test", client_id="id", client_secret="secret", session_secret="s" * 32,
-                        local_http=True, box_dir=str(tmp_path))
-    app = create_app(settings, fake, boxes=store, brain=ScriptedBrain(default=answer()))
-    return app, fake
-
-
-INIT = {"jsonrpc": "2.0", "id": 1, "method": "initialize",
-        "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
-MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
-
-
-async def test_mcp_route_requires_student_identity(cloud):
-    app, fake = cloud
-    alice = fake.issue("alice")
-    async with app.state.mcp.session_manager.run():
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
-            assert (await http.post("/mcp", json=INIT, headers=MCP_HEADERS)).status_code == 401
-            advisor = await http.post("/mcp", json=INIT, headers={**MCP_HEADERS, "Authorization": "Bearer " + alice["advisor"]})
-            assert advisor.status_code == 401
-            student = await http.post("/mcp", json=INIT, headers={**MCP_HEADERS, "Authorization": "Bearer " + alice["student"]})
-            assert student.status_code == 200
-            assert student.json()["result"]["serverInfo"]["name"] == "gremlin-advocate"
-            # the A2A surface and its permissions are untouched
-            assert (await http.get("/.well-known/agent-card.json")).status_code == 200
-
-
-async def test_mcp_tool_call_uses_the_callers_own_box(cloud, store):
-    app, fake = cloud
-    alice = fake.issue("alice")
-    store.write(student_box_name("alice"), store.load("student").text.replace("Riya Example", "Alice Only"))
-    call = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "my_box", "arguments": {}}}
-    async with app.state.mcp.session_manager.run():
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test",
-                                     headers={"Authorization": "Bearer " + alice["student"]}) as http:
-            r = await http.post("/mcp", json=call, headers=MCP_HEADERS)
-            assert r.status_code == 200
-            text = r.json()["result"]["content"][0]["text"]
-            assert "Alice Only" in text and "Riya Example" not in text
-
-
-async def test_first_login_seeds_a_student_box(cloud, store):
-    app, fake = cloud
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
-        assert (await sign_in(app, http, claims(name="Sam Synthetic"))).status_code == 303
-        from gremlin_app import digest
-        name = student_box_name(digest("google-subject"))
-        box = store.load(name)
-        assert box.fields["name"] == "Sam Synthetic" and box.fields["email"] == "student@ucsc.edu"
-        assert box.permission("name", "iso") == "never" and box.section(8) is not None
-        store.append(name, 5, "keep | me")
-        assert (await sign_in(app, http, claims(name="Changed"))).status_code == 303
-        again = store.load(name)
-        assert again.fields["name"] == "Sam Synthetic" and "keep | me" in again.text   # not re-seeded
-        # signed-in session cookie also opens /mcp
-        async with app.state.mcp.session_manager.run():
-            r = await http.post("/mcp", json=INIT, headers=MCP_HEADERS)
-            assert r.status_code == 200
+# The /mcp route of gremlin_app (session cookie, Campus Cubbies bearer, judge mode) is covered in test_gremlin_app.py.

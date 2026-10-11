@@ -25,7 +25,7 @@ import uuid
 
 import httpx
 
-from box import Box, BoxStore, MarkdownBoxStore, _SECTION, parse_box, stamp
+from box import Box, BoxStore, MarkdownBoxStore, _SECTION, parse_box, permission_row_edit, stamp
 
 FILE_PREFIX = "gremlin-"
 TEMPLATE = "student.template.md"
@@ -157,6 +157,13 @@ class CubbyBoxStore:
             raise KeyError(key)
         # whole line, newline to newline, so prose such as "(units: 15)" can never be the match
         self.client.edit_file(doc["file_id"], doc["revision"], "\n" + m.group(0) + "\n", f"\n{key}: {value}\n")
+
+    def set_permission(self, name: str, field_name: str, dept: str, value: str) -> None:
+        if not self._is_cubby(name):
+            return self.fallback.set_permission(name, field_name, dept, value)  # type: ignore[attr-defined]
+        doc = self._read(name)
+        old, new = permission_row_edit(doc["text"], field_name, dept, value)
+        self.client.edit_file(doc["file_id"], doc["revision"], "\n" + old + "\n", "\n" + new + "\n")
 
     def path(self, name: str):
         """Mirrors MarkdownBoxStore.path for callers that print where a box lives."""
