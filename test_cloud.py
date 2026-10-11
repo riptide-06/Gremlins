@@ -51,10 +51,10 @@ class TestStore:
 
 
 @pytest.fixture
-def setup():
+def setup(tmp_path):
     store = TestStore()
     settings = Settings(url="http://test", client_id="test-id", client_secret="test-secret",
-                        session_secret="test-session-secret", local_http=True)
+                        session_secret="test-session-secret", local_http=True, box_dir=str(tmp_path))
     app = create_app(settings, store)
     return app, store, store.issue("alice"), store.issue("bob")
 
