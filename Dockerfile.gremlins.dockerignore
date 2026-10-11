@@ -1,5 +1,6 @@
 *
 !Dockerfile.gremlins
+!cloudbuild.gremlins.yaml
 !pyproject.toml
 !uv.lock
 !gremlin_app.py

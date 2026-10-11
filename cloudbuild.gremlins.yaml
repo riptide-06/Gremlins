@@ -1,0 +1,7 @@
+# Build the gremlin service image with its own Dockerfile and ignore file:
+#   gcloud builds submit --config cloudbuild.gremlins.yaml --ignore-file Dockerfile.gremlins.dockerignore \
+#     --substitutions _IMAGE=us-west1-docker.pkg.dev/gremlins-511221/gremlins/gremlins
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "Dockerfile.gremlins", "-t", "${_IMAGE}", "."]
+images: ["${_IMAGE}"]

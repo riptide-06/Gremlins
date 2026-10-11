@@ -7,11 +7,9 @@ from Campus Cubbies (`Dockerfile`, deployed by Adam). Judge mode needs no Google
 PROJECT=gremlins-511221 REGION=us-west1 SERVICE=gremlins
 gcloud config set project $PROJECT
 gcloud artifacts repositories create gremlins --repository-format=docker --location=$REGION 2>/dev/null || true
-gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE \
-  --ignore-file=Dockerfile.gremlins.dockerignore --config=/dev/null 2>/dev/null \
-  || docker build -f Dockerfile.gremlins -t $REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE . \
-     && docker push $REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE
-gcloud run deploy $SERVICE --image $REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE --region $REGION \
+IMAGE=$REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE
+gcloud builds submit --config cloudbuild.gremlins.yaml --ignore-file Dockerfile.gremlins.dockerignore --substitutions _IMAGE=$IMAGE
+gcloud run deploy $SERVICE --image $IMAGE --region $REGION \
   --allow-unauthenticated --max-instances 1 \
   --set-env-vars PUBLIC_URL=https://$SERVICE-331254975906.$REGION.run.app,DEMO_TOKEN=<pick a long random string>,GREMLIN_MODELS=groq/openai/gpt-oss-120b,nvidia_nim/nvidia/nemotron-3-super-120b-a12b,gemini/gemini-2.5-flash \
   --set-secrets GROQ_API_KEY=groq-key:latest,NVIDIA_NIM_API_KEY=nim-key:latest,GEMINI_API_KEY=gemini-key:latest,SESSION_SECRET=session-secret:latest
