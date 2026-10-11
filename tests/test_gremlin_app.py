@@ -257,6 +257,11 @@ async def test_judge_mode_chat_and_api(tmp_path):
         assert v2["verdict"] == "ESCALATED" and "E-02" in v2["escalations"]           # new information, same question
         assert (await http.post("/api/approve", json={"field": "hours", "dept": "iso"}, headers=headers)).json()["ok"] is True
         assert (await http.get("/api/open_items", headers=headers)).json() == []
+        # reset puts the synthetic student back: no session lines, no approval, deadline back to 9
+        assert "SESSION" in (await http.get("/api/box", headers=headers)).json()["box"]
+        assert (await http.post("/api/reset", json={}, headers=headers)).json()["ok"] is True
+        box_after = (await http.get("/api/box", headers=headers)).json()["box"]
+        assert "SESSION" not in box_after and "APPROVED" not in box_after and "days_to_deadline: 9" in box_after
         # a signed-in student with no Google account never touched Firestore
         assert not hasattr(app.state, "firestore_touched")
 

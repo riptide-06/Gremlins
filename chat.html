@@ -45,6 +45,7 @@ h3{font-size:14px;margin:14px 0 6px}
   <span class="tag" id="who">student</span>
   <span class="spacer"></span>
   <span id="status"></span>
+  <button id="reset" type="button" title="Judge mode: put the synthetic student back to the start" hidden>reset demo</button>
   <a href="/" title="Credentials and MCP setup">connect your own agent</a>
 </header>
 <main>
@@ -88,7 +89,8 @@ h3{font-size:14px;margin:14px 0 6px}
     return fetch(path, opt).then(function(r){ if(r.status===401){ location.href='/'; } return r.json(); });
   }
   function refreshBox(){
-    api('/api/box').then(function(d){ document.getElementById('box').textContent = d.box || d.error || ''; document.getElementById('who').textContent = d.student || 'student'; });
+    api('/api/box').then(function(d){ document.getElementById('box').textContent = d.box || d.error || ''; document.getElementById('who').textContent = d.student || 'student';
+      document.getElementById('reset').hidden = !(d.student||'').startsWith('demo'); });
     api('/api/open_items').then(function(items){
       var el=document.getElementById('open'); if(!items||!items.length){ el.textContent='none'; return; }
       el.innerHTML = items.map(function(i){ return '<div class="row"><span class="dept">'+esc(i.dept)+'</span> needs <b>'+esc(i.fields.join(', '))+'</b> for: '+esc(i.question)+'</div>'; }).join('');
@@ -142,6 +144,9 @@ h3{font-size:14px;margin:14px 0 6px}
   document.getElementById('setgo').onclick=function(){
     var k=document.getElementById('setk').value.trim(), v=document.getElementById('setv').value.trim(); if(!k) return;
     api('/api/set',{field:k,value:v}).then(function(d){ status.textContent=d.ok?'set '+k+' = '+v:(d.error||'not set'); refreshBox(); });
+  };
+  document.getElementById('reset').onclick=function(){
+    api('/api/reset',{}).then(function(d){ if(d.ok){ log.innerHTML=''; status.textContent='demo student reset'; refreshBox(); } else { status.textContent=d.error||'not reset'; } });
   };
   refreshBox();
 })();

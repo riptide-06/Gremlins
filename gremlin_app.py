@@ -362,8 +362,22 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
             return page("Judge mode is not open.", '<p>Ask the team for the judge link, or <a href="/">sign in with your UCSC account</a>.</p>')
         request.session.clear()
         request.session.update({"uid": DEMO_UID, "csrf": secrets.token_urlsafe(32)})
+        if not getattr(request.app.state, "demo_pristine", None) and boxes.exists(settings.demo_box):
+            request.app.state.demo_pristine = boxes.load(settings.demo_box).text   # for /api/reset between judges
         emit("demo_login")
         return RedirectResponse("/chat", status_code=303)
+
+    async def api_reset(request):
+        """Judge mode only: put the synthetic student box back the way it was at first demo login."""
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        pristine = getattr(request.app.state, "demo_pristine", None)
+        if uid != DEMO_UID or not pristine:
+            return JSONResponse({"ok": False, "error": "reset is only for the demo student"}, status_code=400)
+        await asyncio.to_thread(boxes.write, settings.demo_box, pristine)
+        emit("demo_reset")
+        return JSONResponse({"ok": True})
 
     async def chat(request):
         if not request.session.get("uid"):
@@ -578,6 +592,7 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
                             Route("/demo", demo), Route("/chat", chat),
                             Route("/api/ask", api_ask, methods=["POST"]), Route("/api/approve", api_approve, methods=["POST"]),
                             Route("/api/set", api_set, methods=["POST"]), Route("/api/box", api_box), Route("/api/open_items", api_open_items),
+                            Route("/api/reset", api_reset, methods=["POST"]),
                             Route("/credentials", credentials, methods=["POST"]), Route("/revoke", revoke, methods=["POST"]),
                              Route("/logout", logout, methods=["POST"]), Route("/gremlin_client.py", download), Route("/health", health), Route("/healthz", health),
                              Route("/gremlin_slim.py", slim_download), Route("/SLIM.md", slim_instructions),
