@@ -136,17 +136,19 @@ def score_options(options: list[dict], preferences: list[str]) -> list[dict]:
 _COND_KEYS = re.compile(r"(?<![\w.])([A-Za-z_][A-Za-z0-9_]*)\s*(?:==|!=|<=|>=|<|>|~)")
 
 
-def serves(when: str, student: Box) -> bool:
-    """A box's `serves:` line says which students the office is for, in the escalation
-    condition grammar over the student's own fields (`major ~ game design|computational media`).
-    The advocate reads the student's box for this; nothing is shared. No line, or a condition
-    on a field the student has not filled in, means the office is consulted."""
+def serves(when: str, student: Box, question: str = "") -> bool:
+    """A box's `serves:` line says who the office is for, in the escalation condition grammar
+    over the student's own fields plus the question (`major ~ game design or question ~ CMPM`):
+    a major office serves its majors, and anyone asking about one of its courses. The advocate
+    reads the student's box for this; nothing is shared. No line, or a condition on a field
+    the student has not filled in, means the office is consulted."""
     when = (when or "").strip()
     if not when:
         return True
-    if any(k not in student.fields for k in _COND_KEYS.findall(when)):
+    scope = {**student.fields, "question": question}
+    if any(k not in scope for k in _COND_KEYS.findall(when)):
         return True
-    return match_condition(when, student.fields)
+    return match_condition(when, scope)
 
 
 def append_many(store: BoxStore, name: str, items: list[tuple[int, str]]) -> None:
@@ -190,8 +192,8 @@ class Advocate:
                 meta = self.dept_box(d).meta
             except (FileNotFoundError, OSError, ValueError):
                 meta = {}
-            if not serves(meta.get("serves", ""), student):
-                continue          # this office does not serve this student (a major office for another major)
+            if not serves(meta.get("serves", ""), student, question):
+                continue          # not this student's office, and the question is not about its courses
             topics = meta.get("topics", "").strip()
             if not topics:
                 chosen.append(d)
@@ -201,7 +203,7 @@ class Advocate:
                     chosen.append(d)
             except re.error:
                 chosen.append(d)
-        return chosen or [d for d in candidates if serves(self._meta(d).get("serves", ""), student)] or candidates
+        return chosen or [d for d in candidates if serves(self._meta(d).get("serves", ""), student, question)] or candidates
 
     def _meta(self, dept: str) -> dict:
         try:

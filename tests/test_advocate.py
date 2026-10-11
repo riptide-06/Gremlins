@@ -293,3 +293,11 @@ def test_serves_keeps_a_major_office_out_of_another_majors_question(store):
     store.set_field("student", "major", "Computer Science: Computer Game Design")
     v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s27")
     assert [r.dept for r in v.depts] == ["iso", "registrar"]
+    # a TIM major asking about one of the office's courses is served too (department to department, class to class)
+    store.set_field("student", "major", "Technology and Information Management")
+    text = store.load("registrar").text.replace("serves: major ~ game design|computational media", "serves: major ~ game design|computational media or question ~ \\bCMPM\\b")
+    store.write("registrar", text)
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("Can I add CMPM 120 and still take few units?", "s28")
+    assert [r.dept for r in v.depts] == ["iso", "registrar"]
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s29")
+    assert [r.dept for r in v.depts] == ["iso"]

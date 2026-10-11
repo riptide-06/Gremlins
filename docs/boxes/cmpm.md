@@ -4,7 +4,7 @@ department: cmpm
 name: Computational Media major advising (Baskin Engineering Undergraduate Advising)
 owner: bsoeadvising@ucsc.edu, Baskin Engineering Building room 225
 topics: major|declar|CMPM|CSE|course|class|drop|add|swap|units|credits|prereq|requirement|substitut|petition|elective|capstone|senior|track|graduat|degree|transfer|community college|preapprov|internship|194|199
-serves: major ~ computational media|game design|cmpm|computer science: computer game
+serves: major ~ computational media|game design|cmpm|computer science: computer game or question ~ \bCMPM\b|computational media|game design
 authority_order: federal > state > campus > department
 updated: 2026-10-10
 verified_by: Gremlins team, from catalog.ucsc.edu pages fetched 2026-10-10
