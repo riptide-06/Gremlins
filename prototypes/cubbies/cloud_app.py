@@ -362,11 +362,24 @@ class MonitorHandler(DefaultRequestHandler):
 def page(title, body, discovery=False):
     discovery_links = ('<link rel="describedby" href="/SKILL.md" type="text/markdown" title="Agent connection guide">'
                        '<link rel="alternate" href="/.well-known/agent-card.json" type="application/json" title="Agent Card">') if discovery else ''
+    content = '<h1>' + escape(title) + '</h1>' + body
+    if discovery:
+        # Reuse the film's My Cubby artwork as inline SVG: no asset request needed.
+        folder = ('<aside class="cubby-art" aria-label="My Cubby, your UCSC Google Drive folder">'
+                  '<svg viewBox="0 0 400 300" fill="none" aria-hidden="true" focusable="false">'
+                  '<path d="M28 56q0-18 18-18h113l37 38h158q18 0 18 18v162q0 18-18 18H46q-18 0-18-18Z" fill="#34a853"/>'
+                  '<path d="M28 100h344" stroke="#218B3E" stroke-width="3"/>'
+                  '<path d="M72 141h83" stroke="#DFF3E0" stroke-width="4" stroke-linecap="round"/>'
+                  '<text x="70" y="219" font-family="system-ui,sans-serif" font-size="39" font-weight="600" fill="white">My Cubby</text>'
+                  '</svg><p>Agent-to-agent (A2A) messaging, backed by a simple folder on your UCSC Google Drive.</p></aside>')
+        content = '<main class="landing-grid"><div class="landing-copy">' + content + '</div>' + folder + '</main>'
     return HTMLResponse('<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Campus Cubbies</title>'
         + discovery_links +
-        '<style>body{font:17px system-ui;max-width:620px;margin:12vh auto;padding:24px;line-height:1.6;color:#193c2c;overflow-wrap:anywhere}button{font:inherit}blockquote{margin:16px 0;padding:12px 18px;border-left:3px solid #34a853;background:#f3f8f4}summary{cursor:pointer;padding:8px 0}code{overflow-wrap:anywhere}</style>'
-        '<h1>' + escape(title) + '</h1>' + body + '</html>',
+        '<style>html{background:#fff;color-scheme:light}body{font:17px system-ui;max-width:620px;margin:12vh auto;padding:24px;line-height:1.6;color:#193c2c;overflow-wrap:anywhere}button{font:inherit}blockquote{margin:16px 0;padding:12px 18px;border-left:3px solid #34a853;background:#f3f8f4}summary{cursor:pointer;padding:8px 0}code{overflow-wrap:anywhere}'
+        'body.landing{max-width:1120px;margin:8vh auto}.landing-grid{display:grid;grid-template-columns:minmax(0,620px) minmax(260px,1fr);gap:64px;align-items:start}.landing-copy{min-width:0}.cubby-art{margin-top:100px;text-align:center}.cubby-art svg{display:block;width:100%;height:auto}.cubby-art p{font-size:16px;color:#52715f;margin:20px 0}'
+        '@media(max-width:800px){body.landing{margin:24px auto}.landing-grid{grid-template-columns:1fr;gap:16px}.cubby-art{grid-row:1;margin:0;display:flex;align-items:center;justify-content:center;gap:16px}.cubby-art svg{width:150px;flex-shrink:0}.cubby-art p{font-size:14px;text-align:left}.landing-copy h1{margin-top:12px}}'
+        '</style><body' + (' class="landing"' if discovery else '') + '>' + content + '</body></html>',
         headers={**({"Link": '</SKILL.md>; rel="describedby"; type="text/markdown", </.well-known/agent-card.json>; rel="alternate"; type="application/json"'} if discovery else {}),
                    "Cache-Control": "no-store", "Referrer-Policy": "same-origin", "X-Content-Type-Options": "nosniff",
                    "Content-Security-Policy": "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
@@ -395,11 +408,12 @@ def create_app(settings=None, repo=None, drive=None):
                      + escape(settings.url) + '</blockquote><p>Ask it to help you set up your campus cubby. It will guide you through connecting your UCSC account.</p>'
                      '<p><a href="/SKILL.md">Agents: start here to connect</a>.</p>'
                     '<p><strong>Don’t have an agent?</strong> <a href="https://chat.bayleaf.dev/?model=basic&amp;tools=lathe&amp;q=Help%20me%20set%20up%20my%20Campus%20Cubby.%20Start%20with%20the%20public%20agent%20guide%20at%20https%3A%2F%2Fcubby.bayleaf.dev%2FSKILL.md%20We%20trust%20BayLeaf%20inference.&amp;submit=false">Try Cubbies via Bayleaf Chat</a>.</p>'
+                     '<details><summary>Privacy and data protection</summary>'
                      '<p>Campus Cubbies is a fully integrated production service within the UCSC–Google–BayLeaf infrastructure boundary. '
                      'Google-hosted system data is covered by the campus Data Protection Agreement (DPA); '
                      'BayLeaf has previously been reviewed by the campus CISO. Cubbies itself runs no AI inference. '
                      'Your own agent’s inference provider is where information may leave that boundary and needs separate approval '
-                     'for the information it processes.</p>', discovery=True)
+                     'for the information it processes.</p></details>', discovery=True)
 
     async def device(request):
         try:

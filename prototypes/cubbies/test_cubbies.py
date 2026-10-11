@@ -648,8 +648,12 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
         landing = (await http.get("/")).text
         assert "Give your agent this address" in landing and system.settings.url in landing
         assert 'href="https://chat.bayleaf.dev/?model=basic&amp;tools=lathe&amp;q=Help%20me%20set%20up%20my%20Campus%20Cubby.%20Start%20with%20the%20public%20agent%20guide%20at%20https%3A%2F%2Fcubby.bayleaf.dev%2FSKILL.md%20We%20trust%20BayLeaf%20inference.&amp;submit=false">Try Cubbies via Bayleaf Chat</a>' in landing
-        assert "<details>" not in landing and "Instructions for agents" not in landing
-        assert "A2A" not in landing and "Python" not in landing
+        assert '<details><summary>Privacy and data protection</summary>' in landing
+        assert '<details open' not in landing
+        assert 'for the information it processes.</p></details>' in landing
+        assert "Instructions for agents" not in landing
+        assert "Agent-to-agent (A2A) messaging, backed by a simple folder on your UCSC Google Drive." in landing
+        assert "Python" not in landing
         assert "can’t peek at what’s inside" in landing
         assert "fully integrated production service" in landing
         assert "campus Data Protection Agreement (DPA)" in landing
