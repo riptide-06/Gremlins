@@ -4,6 +4,7 @@ stdio (Claude Desktop, Claude Code):
     uv run mcp_server.py                     # every department with a box, in-process
     DEPT_URLS=iso=http://127.0.0.1:10001,cmpm=http://127.0.0.1:10002 uv run mcp_server.py   # over A2A
     STUDENT_BOX=student-me uv run mcp_server.py           # another student box under docs/boxes/
+    BOX_STORE=cubby CUBBY_URL=https://cubby.bayleaf.dev CUBBY_TOKEN=... uv run mcp_server.py   # box in your real cubby
 
 Claude Desktop config:
     {"mcpServers": {"gremlin": {"command": "uv", "args": ["run", "--directory", "<repo>", "mcp_server.py"]}}}
@@ -87,7 +88,9 @@ def build_mcp(resolve: Callable[[], Advocate | None], **settings) -> FastMCP:
 
 
 def main() -> None:
-    adv = default_advocate(brain=default_brain(), student_box=os.environ.get("STUDENT_BOX", "student"))
+    from cubby_store import from_env
+    store = from_env()   # BOX_STORE=cubby: the student box lives in the student's Campus Cubby (Drive)
+    adv = default_advocate(store=store, brain=default_brain(), student_box=os.environ.get("STUDENT_BOX", "student"))
     build_mcp(lambda: adv).run("stdio")
 
 

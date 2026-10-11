@@ -36,6 +36,20 @@ connector in Claude (or any MCP client) with `Authorization: Bearer <token>`.
 Tools: `ask`, `my_box`, `approve_share`, `open_items`. Your box is seeded from
 [docs/boxes/student.template.md](docs/boxes/student.template.md) on first login.
 
+**Student, box in your real cubby:** pair your agent with Campus Cubbies (the
+pairing page at https://cubby.bayleaf.dev gives you a private token), then
+
+```sh
+export CUBBY_URL=https://cubby.bayleaf.dev CUBBY_TOKEN=...   # never into a file or a chat
+uv run cubby_store.py check                                # hello, your folder link, files
+uv run cubby_store.py seed                                 # creates gremlin-student.md from the template
+uv run demo.py --store cubby --questions c1                # the advocate reads and appends to that file
+BOX_STORE=cubby uv run mcp_server.py                       # same, from your own Claude over MCP
+```
+
+Open the folder link: the verdict lines appear in `gremlin-student.md` in your Drive.
+Department boxes never go there; they are policy and stay on the server.
+
 **Laptop, everything local:**
 
 ```sh
@@ -109,23 +123,25 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 | A2A 1.0 JSON-RPC (a2a-sdk 1.2.2) between the advocate and department gremlins | real: `dept_gremlin.py serve`, agent card, skill `answer`, `advocate.over_a2a` |
 | SLIM transport for a department | real: `gremlin_slim.py` gateway in front of the ISO gremlin, `demo.py --transport slim` when a node is up |
 | in-process callers | the default so the demo runs anywhere; the contract is identical |
+| Campus Cubbies A2A (`hello`, `list_files`, `read_file`, `create_file`, `edit_file`) | real: `cubby_store.py` keeps the student box as a file in the student's Drive cubby, exact-match edits against the revision just read |
 | AGNTCY Directory / OASF discovery | stand-in: each box's `topics:` line is the capability record the advocate selects on; publishing the agent cards to a directory is the next step |
 | Observe | stand-in: structured JSON events on stdout and pointers-only session logs in each box |
 
 ## What was built this weekend, and what was not
 
 Built October 10 to 11: `box.py`, `brain.py`, `dept_gremlin.py`, `wall.py`, `advocate.py`,
-`mcp_server.py`, `baseline.py`, `eval.py`, `demo.py`, `chat.html`, the judge mode and
+`mcp_server.py`, `cubby_store.py`, `baseline.py`, `eval.py`, `demo.py`, `chat.html`, the judge mode and
 `/api` routes in `gremlin_app.py` (the advocate service, grown from the Firestore
 prototype's login), the four department boxes, the student template and
 demo student, `docs/CUBBY.md`, `docs/QUESTIONS.md`, and the tests.
 
 Pre-existing (Adam Smith's Campus Cubbies / BayLeaf work and the earlier memory
-prototype in this repo): the Cloud Run service with UCSC Google login and bearer
-credentials, the Firestore memory notebook (`gremlin_memory.py`, `/a2a`), the SLIM
-gateway, and the cubby-in-Drive design with a service account per student. The Drive
-box store (`box.GoogleDocBoxStore`) and the BayLeaf brain (`brain.BayleafBrain`) are
-stubs with the interface fixed; the Markdown store is the cubby today.
+prototype in this repo): Campus Cubbies itself (`prototypes/cubbies/`: UCSC Google
+login, the Drive folder per student, grants, contributions, the A2A tool surface at
+cubby.bayleaf.dev), the Firestore memory notebook, the SLIM gateway, and the earlier
+echo prototype. The BayLeaf brain (`brain.BayleafBrain`) is a stub with the interface
+fixed. The Markdown store is the default; `cubby_store.py` is the same box living in
+the real cubby.
 
 Eval questions and the department prompt were iterated during development; the
 numbers in `docs/EVAL.md` are from the final run, not a held-out set.

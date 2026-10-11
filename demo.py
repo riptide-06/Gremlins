@@ -180,7 +180,7 @@ def run(store: MarkdownBoxStore, brain=None, transport: str = "auto", log=print,
         log(f"transport: ISO over A2A over HTTP to a dept_gremlin.py you started on :{DEPT_PORT}; the rest in-process")
     else:
         log("transport: in-process (no SLIM node detected)")
-    log(f"boxes: {store.root}   departments: {', '.join(depts)}")
+    log(f"boxes: {getattr(store, 'root', None) or store}   student box: {store.path('student')}   departments: {', '.join(depts)}")
     adv = Advocate(store=store, depts=depts)
     verdicts: list[Verdict] = []
     questions = questions or QUESTIONS
@@ -231,7 +231,16 @@ if __name__ == "__main__":
     parser.add_argument("--live", action="store_true", help="use docs/boxes/ directly instead of a fresh copy")
     parser.add_argument("--transport", choices=["auto", "inprocess", "a2a", "slim"], default="auto")
     parser.add_argument("--questions", default="", help="comma-separated ids from QUESTIONS (default: all)")
+    parser.add_argument("--store", choices=["markdown", "cubby"], default="markdown",
+                        help="cubby: the student box is gremlin-student.md in the real Campus Cubby (CUBBY_URL, CUBBY_TOKEN)")
     args = parser.parse_args()
     wanted = {q.strip() for q in args.questions.split(",") if q.strip()}
     chosen = [q for q in QUESTIONS if not wanted or q[0] in wanted]
-    run(prepare_boxes(args.live), brain=default_brain(), transport=args.transport, questions=chosen)
+    if args.store == "cubby":
+        from cubby_store import CubbyBoxStore, CubbyClient
+        store = CubbyBoxStore(CubbyClient(os.environ["CUBBY_URL"], os.environ["CUBBY_TOKEN"]), MarkdownBoxStore(BOXES))
+        if not store.exists("student"):
+            raise SystemExit("No gremlin-student.md in the cubby yet: run `uv run cubby_store.py seed` first.")
+    else:
+        store = prepare_boxes(args.live)
+    run(store, brain=default_brain(), transport=args.transport, questions=chosen)
