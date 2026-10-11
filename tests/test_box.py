@@ -1,5 +1,4 @@
 """Box parsing, permissions, append, and trigger conditions. Synthetic data only."""
-import shutil
 from pathlib import Path
 
 import pytest
@@ -7,13 +6,6 @@ import pytest
 from box import MarkdownBoxStore, match_condition, parse_box, seed_student_box, log_line
 
 ROOT = Path(__file__).resolve().parent.parent / "docs" / "boxes"
-
-
-@pytest.fixture
-def store(tmp_path):
-    for f in ROOT.glob("*.example.md"):
-        shutil.copy(f, tmp_path / f.name)
-    return MarkdownBoxStore(tmp_path)
 
 
 def test_parses_department_box(store):
