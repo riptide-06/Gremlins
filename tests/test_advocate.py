@@ -144,14 +144,18 @@ def fake_dept(units, authority, cites=("F-01",), escalate=False):
 def test_disputed_at_equal_authority_and_precedence_otherwise(store, tmp_path):
     # a second department whose box is the ISO box under another name
     store.write("registrar", store.load("iso").text)
-    adv = Advocate(store=store, depts={"iso": fake_dept(12, "campus"), "registrar": fake_dept(6, "campus")})
+    # the authority behind a position is that of the facts its best option cites (F-07 is department level, F-01 federal)
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "campus", cites=("F-07",)), "registrar": fake_dept(6, "campus", cites=("F-07",))})
     v = adv.ask_sync("How few units can I take?", "s13")
     assert v.kind == "DISPUTED" and v.brief["disputed"] and v.brief["decides"] == ["ISO", "REGISTRAR"]
     assert v.best["units"] == 6  # preferences still rank the pooled options
     assert any("DISPUTED" in l for l in store.load("student").section(6).lines)
-    adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal"), "registrar": fake_dept(6, "campus")})
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "campus", cites=("F-07",))})
     v = adv.ask_sync("How few units can I take?", "s14")
     assert v.kind == "CONVERGED" and v.brief["precedence"] == ["ISO wins by authority_order (federal)"]
+    # quoting a federal rule in passing does not lift a department-level recommendation
+    adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "federal", cites=("F-07",))})
+    assert adv.ask_sync("How few units can I take?", "s15").kind == "CONVERGED"
 
 
 def test_default_advocate_builds_iso_in_process(store):

@@ -53,7 +53,7 @@ major | yes | yes | yes | yes
 major_declared | yes | yes | yes | no
 quarter_number | no | yes | yes | yes
 units | yes | yes | yes | yes
-hours | ask | ask | ask | ask
+hours | ask | ask | yes | ask
 gpa | no | ask | yes | ask
 visa | yes | yes | yes | ask
 rcl_on_file | yes | no | yes | no

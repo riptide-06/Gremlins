@@ -255,13 +255,21 @@ class Advocate:
         return v
 
     def _positions(self, student: Box, answered: list[DeptResult]) -> tuple[list[str], list[str], list[str]]:
-        """Compare departments by their best option's units. Equal authority -> disputed."""
+        """Compare departments by their best option's units. The authority behind a position is
+        the highest authority among the facts that option cites (not everything the department
+        mentioned), so a campus office quoting a federal rule in passing does not outrank the
+        office that administers it. Equal authority -> disputed; otherwise authority_order decides."""
         agreed, disputed, decides = [], [], []
         best = {}
         for r in answered:
             opts = score_options(r.answer.get("options", []), student.preferences)
             if opts and isinstance(opts[0].get("units"), (int, float)):
-                best[r.dept] = (opts[0]["units"], r.answer.get("authority", ""), opts[0]["option"])
+                authority = ""
+                try:
+                    authority = self.dept_box(r.dept).highest_authority(opts[0].get("cites", []))
+                except (FileNotFoundError, OSError, ValueError):
+                    pass
+                best[r.dept] = (opts[0]["units"], authority or r.answer.get("authority", ""), opts[0]["option"])
         depts = list(best)
         for i, a in enumerate(depts):
             for b in depts[i + 1:]:

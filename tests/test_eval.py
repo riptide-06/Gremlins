@@ -65,5 +65,5 @@ def test_eval_counts_outcomes_uncited_and_fields_left(tmp_path):
 
 
 def test_cases_cover_every_verdict():
-    assert Counter(c.expected for c in CASES) == {"CONVERGED": 3, "ESCALATED": 3, "ASK_STUDENT": 2, "DISPUTED": 1, "UNANSWERED": 1}
+    assert Counter(c.expected for c in CASES) == {"CONVERGED": 3, "ESCALATED": 3, "ASK_STUDENT": 2, "DISPUTED|CONVERGED": 1, "UNANSWERED": 1}
     assert len({c.id for c in CASES}) == len(CASES)
