@@ -50,6 +50,9 @@ this file owns infrastructure and acceptance evidence, not a second connection g
    The CSRF-protected login POST finishes with a same-origin 200 page; its ordinary
    Google sign-in link starts a new top-level navigation, outside the form redirect
    chain. Authlib still stores OAuth state, nonce and the PKCE verifier in the session.
+- Durable monitor records use `cubby_monitors.expires_at` as a native timestamp
+  TTL field (seven days). Application lookup enforces expiry immediately;
+  Firestore deletion is asynchronous. Feed and delivery retry records have no TTL.
 
 ## Repeat deployment
 
@@ -76,6 +79,19 @@ to the upstream. Root upload allowlists and Dockerfile package active app code
 and the canonical guide only, not archives/private configuration. For a new
 environment use `.env.example` and provision the scoped resources above; do not
 replace identities or copy the existing secrets into images.
+
+For a new environment, enable only the monitor collection's TTL:
+
+```sh
+gcloud firestore fields ttls update expires_at --collection-group=cubby_monitors --database='(default)' --enable-ttl --project=gremlins-511221 --account=amsmith@ucsc.edu --quiet
+```
+
+The 30-second request timeout is unchanged. Monitor subscriptions close after
+20 seconds and reconnect/poll using durable owner-scoped task IDs. No background
+Cloud Run CPU, webhook service, task queue or new secrets are required. First feed
+use backfills committed deliveries under the existing recipient lock; pending
+uploads require contributor retry, as before. Deploy during a quiet window so an
+old writing revision cannot publish legacy receipts after backfill has finished.
 
 Re-deploy the domain proxy only when its source/config changes:
 
@@ -221,3 +237,190 @@ and preserved. Cloudflare Worker source/config and secrets were not changed.
 Second-person peer delivery, manual-file scope behavior, institutional approval,
 account deletion and distributed writer safety remain unverified or unimplemented;
 see [PLAN.md](PLAN.md) and [README.md](README.md).
+
+## Contribution feed and monitor deployment
+
+Deployed October 11, 2026 UTC as **`gremlin-00022-mqz`**, 100% traffic, card version
+0.5.0. `changes_since` and A2A monitor tasks share confirmed-delivery metadata
+events, with independent owner-bound signed checkpoints. Receipt, sequence, event
+and deterministic audit commit in one transaction after Drive confirms delivery.
+First use backfills existing delivered receipts; pending uploads remain retry-driven.
+No arbitrary Drive-change tracking, content replication or model invocation was added.
+
+Monitors return actual SDK/protobuf Tasks. GetTask, CancelTask, bounded 20-second
+SubscribeToTask and SendStreamingMessage are served through official A2A 1.0
+routes. Durable owner-scoped records survive restarts; request-driven completion
+avoids Cloud Run background CPU assumptions. Original checkpoints remain in task
+metadata, including after cancellation. New messages reject both protobuf JSON
+spellings of task/context references before reaching the immediate-tool registry.
+Task IDs have enforced seven-day expiry and deletion on expired lookup. The new
+`cubby_monitors.expires_at` TTL policy finished activation with platform state
+`ACTIVE`. Actual deletion remains asynchronous; application expiry does not wait
+for the TTL sweep.
+
+All **98 Python tests and six Node tests** pass, with frozen dependency sync,
+compilation and diff whitespace checks. Coverage includes tied timestamps, stable
+pagination, retry/transaction rollback, legacy backfill and bootstrap boundary,
+independent monitors/catch-up, cancellation, reconnect/restart, owner/admin/source
+isolation, history absence, expired/revoked credentials, streaming EOF/rearm and
+official SDK task lifecycle plus raw HTTP/protobuf envelopes. The real repository
+transaction adapter was also exercised with a retrying transaction double. No
+Firestore emulator or Java runtime was available; mocks do not establish live
+Firestore contention behavior. Authlib's existing deprecation warning remains.
+
+Live health/root/card/guide/llms checks pass; served guide matches source exactly.
+All five supported A2A methods deny missing credentials (401); invalid-bearer
+denials were also checked. Retired downloads remain 404. Same-origin login finishes
+with HTTP 200 and an ordinary Google link, without a form redirect. Custom-domain
+and upstream CSP match, including only same-origin connect access, with no CORS
+header. No account selection, consent, private Drive mutation, live contribution
+or authenticated live task operation was performed. Authenticated task behavior
+is verified offline, not newly claimed live.
+
+Runtime/Drive identities, OAuth client, public origin, administrator allowlist,
+pinned secrets, 1 CPU/512 MiB, concurrency 20, timeout 30 and both one-instance
+limits were checked and preserved. Public invoker IAM is unchanged. Cloudflare
+Worker/config was not changed. Build upload remains the seven allowlisted files.
+The canonical guide now recommends a secret-free local skill after first connection,
+so future checks reuse valid private credentials instead of repeating onboarding.
+
+## Read-only onboarding refinement
+
+October 11, 2026: the canonical guide now gives five visible milestones, a bounded
+read-only first check of inventory and existing contributions, and an optional
+secret-free reconnect skill that refreshes guide/card/hello rather than freezing
+schemas. `hello` points to that setup boundary without duplicating the guide.
+Monitoring remains opt-in, with the last processed catch-up checkpoint, never a
+silent from-now reset. Existing monitor implementation and illustration files are
+preserved; landing copy, Google flow, CSP and protocol are unchanged.
+
+Offline verification: **101 Python tests and six Node tests pass**, frozen sync,
+compilation and diff whitespace checks pass. New acceptance covers the published
+instruction entrypoint/evolution contract and a non-mutating protocol demonstration
+with existing notes, partial backlog, an empty feed/nonempty folder and an arrival
+between catch-up and opt-in monitoring. This demonstrates API affordances and tests
+published instructions, not that an LLM follows them. The existing Authlib warning
+remains. Build upload contains only the seven approved files, excluding tests and
+illustrations.
+
+After human deployer reauthentication, deployed as **`gremlin-00023-s8d`**, serving
+100% traffic. Live custom-domain and upstream guides match the canonical source
+exactly. Root, card, llms pointer and health bodies are unchanged from the pre-deploy
+snapshot; the card remains version 0.5.0 with the same A2A 1.0 endpoint. CSP matches
+the pre-deploy snapshot and upstream (one header on the landing); the human connection
+page still offers the UCSC Google flow. All five A2A methods deny missing credentials
+with 401, and `/guide` plus retired downloads return 404.
+
+Pre/post configuration comparison confirms unchanged runtime/build/Drive identities,
+OAuth client, public origin, administrator allowlist, environment and version-pinned
+secret bindings, 1 CPU/512 MiB, concurrency 20, timeout 30, zero minimum and both
+one-instance limits. Public invoker IAM is unchanged. Cloudflare was not modified.
+No live Drive operations, cubby consent, contributions or authenticated task operations
+were performed; authenticated behavior is covered offline, not newly claimed live.
+No commit was made.
+
+## Inference-environment trust prerequisite
+
+October 11, 2026: canonical SKILL.md now requires current user/institution-approved
+inference/data handling before pairing, credential loading/use or authenticated
+operations, on new/reconnected sessions and processing-boundary changes. It supplies
+an unknown-trust question, known-untrusted abort and mid-operation stop procedure,
+including local polling and secure credential handling. Saved reconnect instructions
+carry the prerequisite themselves, before authenticated fetching; browser fallback
+does not change it. `hello` adds a brief defense-in-depth reminder. The landing,
+protocol, Google flow, CSP, monitor implementation and illustrations are unchanged.
+
+This is an agent-side behavioral check, not a server security boundary: the server
+cannot identify/enforce an inference provider. Approval remains user/institution
+policy, not a verified provider property. Tests assert published instruction content
+and placement, not LLM compliance or institutional approval.
+
+Offline verification: **102 Python tests and six Node tests pass**, frozen sync,
+compilation and whitespace checks pass. The existing Authlib HTTPX deprecation warning
+remains. Build upload still contains only the seven allowlisted app/guide files.
+
+Deployed as **`gremlin-00024-w2n`**, serving 100% traffic. Both custom-domain and
+upstream served guides exactly match source. Root, health, Agent Card and llms pointer
+bodies plus CSP are unchanged from the pre-deploy snapshot; all five A2A methods
+deny unauthenticated requests with 401. Pre/post comparison preserves runtime/build
+identity, environment, version-pinned secret bindings, service/revision limits,
+CPU/memory, concurrency, timeout and public invoker IAM. Cloudflare was not changed.
+The `hello` reminder is verified in code and offline authenticated tests, not through
+a live private read. No pairing, campus consent, authenticated live operations or
+private data reads were performed. No commit was made.
+
+## Single-use exchange capture and human handoff
+
+October 11, 2026: read-only authenticated owui-cli inspection of the requested
+conversation's complete six-message tree (one selected branch) found a successful
+token exchange piped through output redaction without saving the credential. The
+agent then acknowledged the lost, single-use bearer and required another approval.
+This is an agent capture/storage mistake, not evidence of a pairing protocol bug.
+Later client failures returned HTTP 403 with `error code: 1010`; curl succeeded.
+Public-only checks reproduced Python's 403/1010 at the custom domain and 200 at
+the upstream, while curl worked at the custom domain. No edge rule was changed.
+
+The canonical guide now requires private capture and atomic credential storage in
+the exchange workflow before returning a safe status. It explicitly preserves
+private pairing state/deadline across a human handoff and asks the person to return
+and say “Done” when the host cannot poll and resume reasoning unattended. Human
+completion is not proof of approval: poll the retained pairing, or start fresh if
+expired/lost. Existing ten-minute expiry, minimum five-second polling, backoff and
+single-use exchange remain unchanged. Approval polling is distinguished from A2A
+contribution monitors, which cannot wake the host or complete pairing. The guide
+also distinguishes edge/client errors from consent/service failures and identifies
+hello tool entries by their actual `action` field, not guessed name/tool keys.
+
+All **103 Python tests and six Node tests pass**, with frozen sync, compilation
+and whitespace checks. New coverage asserts the served instruction contract and
+actual hello schema identifiers, not LLM compliance or background host capability.
+Existing browser helper, trust prerequisite, read-only first check, monitor code,
+OAuth/CSP and illustrations are unchanged. Authlib's existing warning remains.
+Build upload contains only the seven previously approved files. Raw conversation
+data was kept in approved private temporary storage outside the repository; no
+chat/config mutation, campus consent, private cubby operations or commit occurred.
+
+Deployed as **`gremlin-00025-c7t`**, serving 100% traffic. Both custom-domain and
+upstream served guides match source exactly. Root, health, Agent Card and llms
+bodies plus CSP match the pre-deploy snapshot; there is no added CORS header.
+All five A2A methods reject missing credentials with 401; `/guide` and retired
+download checks return 404. Pre/post comparison preserves runtime/build identity,
+all environment and version-pinned secret bindings, OAuth/public origin, resource
+limits, service/revision one-instance limits and public invoker IAM. Cloudflare
+was not changed. The 403/1010 client restriction remains: the guide describes a
+permitted-client fallback, not a platform rule fix. Actual authenticated exchange
+and inspection are covered offline, not newly claimed live. No commit was made.
+
+## Agent-facing prose cleanup
+
+October 11, 2026: SKILL.md now has first-connection/reconnect/browser navigation,
+shorter onboarding and feed explanations, and private capture instructions before
+the exchange call. It remains the canonical connection/transport guide; authenticated
+hello owns current tool schemas and workspace conventions. Hello instructions now
+link to transport rules rather than repeating them. Agent Card, llms pointer and
+already concise tool descriptions needed no changes. No new documentation page,
+schema architecture or feature was added.
+
+Guide prose decreased from **4,421 to 3,587 whitespace-delimited words** (19%),
+excluding fenced code. Fenced code remains **643 words**, byte-for-byte unchanged
+in all seven blocks, including the browser helper. Hello string words decreased
+from 344 to 297 (count includes schema keys/descriptions). Trust/reconnect approval,
+human Done handoff, single-use capture, read-only setup, bounded backlog, independent
+cursors and durable monitor restart rules remain. Prior monitor and illustration
+work was preserved.
+
+All **103 Python tests and six Node tests pass**, as do frozen dependency sync,
+compilation and whitespace checks. First-check assertions now allow sentence/markup
+changes while checking required decisions; a capture-before-exchange ordering check
+was added. These test published requirements and offline API behavior, not LLM
+compliance. The existing Authlib HTTPX deprecation warning remains. All navigation
+anchors resolve. Build upload remains the seven allowlisted app/guide files.
+
+Deployed as **`gremlin-00026-44x`**, serving 100% traffic. Custom-domain and upstream
+guides match source exactly. Root, health, card and llms bodies and CSP match the
+pre-deploy snapshot; no CORS header was added. All five A2A methods reject missing
+credentials with 401; `/guide` and the checked retired download paths return 404.
+Pre/post comparison confirms unchanged runtime/build identities, all environment
+and version-pinned secret bindings, resource/one-instance limits, ingress and
+public invoker IAM. Cloudflare was not changed. No live pairing, consent, private
+reads, authenticated operations, OWUI mutation or commit was performed.

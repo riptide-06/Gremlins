@@ -47,6 +47,10 @@ without application content, auth logic, logging, caching or storage.
 
 ## Engineering boundaries
 
+- Inference-environment approval is an **agent-side behavioral prerequisite**, owned
+  by SKILL.md and carried into saved reconnect skills. User/institution policy is
+  authoritative; the server cannot detect or enforce the caller's inference provider.
+  Instruction-contract tests do not establish provider properties or agent compliance.
 - **One worker, one active app instance, one writing revision.** Recipient
   mutexes plus 180-second Firestore leases serialize app operations. Leases are
   not renewable/fenced; a stalled operation can outlive its lease. Do not enable
@@ -64,15 +68,24 @@ without application content, auth logic, logging, caching or storage.
   propagation version changes and should retry without weakening the guard.
 - Delivery reserves an owner-created Drive ID before upload, rejects changed
   contents for the same retry key, and retries final status/deterministic audit.
+  Receipt, feed event and audit now commit in one Firestore transaction after
+  confirmed upload. Per-owner sequences order contributions independently of
+  timestamps. First use backfills existing delivered receipts under the owner lock.
   A file can exist without final status if a failed caller never retries. There
   is no background reconciliation. Receipts mean delivery, not reading.
 - Firestore is server-only metadata, not note content: `cubby_users`, `grants`,
-  `tokens`, `pairings`, `locks`, `deliveries`, and `audit` (all `cubby_` prefixed).
+  `tokens`, `pairings`, `locks`, `deliveries`, `audit`, `feeds` (nested events), and
+  `monitors` (all `cubby_` prefixed).
   Refresh tokens are encrypted; bearer/device secrets are hashed. Audit fields
   are allowlisted. Admin access is metadata/relationships, not others' files.
 - Expiry enforcement is not deletion. Numeric credential timestamps are not
   native Firestore TTL fields. Retention/account deletion needs policy and a
   cleanup implementation. Preserve delivery retry records to prevent duplicates.
+- Change cursors are signed and owner-bound. Feed scope is contribution deliveries,
+  not arbitrary Drive edits. Monitor tasks are durable/request-driven, completed
+  by GetTask or a bounded subscription, never background timers. Polling and streams
+  work after restarts; each task/caller has an independent cursor. Tasks have seven-day
+  enforced expiry and asynchronous Firestore TTL cleanup, not an immortal watcher.
 
 Existing offline and live evidence is recorded in the deployment file; mocks
 do not establish campus policy, real consent, or external concurrency guarantees.

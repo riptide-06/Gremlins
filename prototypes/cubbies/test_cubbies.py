@@ -41,6 +41,9 @@ class MemoryRepo:
             raise RuntimeError("backend unavailable")
         self.data[kind, key] = deepcopy(data)
 
+    def delete(self, kind, key):
+        self.data.pop((kind, key), None)
+
     def change(self, kind, key, fn):
         with self.mutex:
             data, result = fn(self.get(kind, key))
@@ -56,6 +59,29 @@ class MemoryRepo:
             if token:
                 self.put("tokens", token_key, token)
             return token
+
+    def atomic(self, refs, fn):
+        with self.mutex:
+            writes, result = fn([self.get(kind, key) for kind, key in refs])
+            previous = deepcopy(self.data)
+            try:
+                for (kind, key), data in writes.items():
+                    self.put(kind, key, data)
+            except Exception:
+                self.data = previous
+                raise
+            return result
+
+    def owner_deliveries(self, owner):
+        return [deepcopy(v) for (kind, key), v in self.data.items() if kind == "deliveries" and v["dst"] == owner]
+
+    def event_ref(self, owner, sequence):
+        return ("feeds/" + digest(owner) + "/events", f"{sequence:020d}")
+
+    def events(self, owner, after, through, limit):
+        kind = "feeds/" + digest(owner) + "/events"
+        return [deepcopy(v) for k, v in sorted((key, value) for (collection, key), value in self.data.items()
+                if collection == kind and after < value["sequence"] <= through)][:limit]
 
     @contextmanager
     def lock(self, key):
@@ -416,6 +442,122 @@ async def test_landing_discovery_to_documented_pairing_and_hello(system, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_canonical_onboarding_and_evolving_reconnect_instructions(system):
+    """Published instruction contract, not evidence that an LLM will follow it."""
+    app = create_app(system.settings, system.repo, system.drive)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url=system.settings.url) as http:
+        card = (await http.get("/.well-known/agent-card.json")).json()
+        guide = (await http.get(card["documentationUrl"])).text
+        milestones = ["**Explain discovery.**", "**Ask for human approval.**",
+                      "**Share the Drive link.**", "**Make the first read-only check**",
+                      "**Offer a reconnect skill.**"]
+        assert [guide.index(m) for m in milestones] == sorted(guide.index(m) for m in milestones)
+        first_check = guide.split("### First read-only check\n", 1)[1].split("### Make future checks easy", 1)[0]
+        # Check required decisions, allowing sentence structure and markup to change.
+        first_check = " ".join(first_check.replace("**", "").split())
+        for requirement in (
+            r'changes_since.*without a cursor.*beginning.*not.*start: "now"',
+            r'no feed events.*not.*empty cubby',
+            r'cursor only after every event.*assessed/reported or durably recorded as unresolved',
+            r'stopping midway.*preceding cursor.*replay',
+            r'untrusted data.*not.*instructions',
+        ):
+            assert re.search(requirement, first_check), requirement
+        reconnect = guide.split("### Make future checks easy\n", 1)[1].split("### Catch up", 1)[0]
+        assert "fetch the current guide and Agent Card" in reconnect and "fresh `hello`" in reconnect
+        assert "before sending credentials" in reconnect and "never silently reset it to now" in reconnect
+        assert "not a copied guide" in reconnect and "bounded read-only replay" in reconnect
+        assert "Monitoring is optional, not part of a generic setup request" in guide
+        assert "same onboarding milestones and bounded first read-only check" in guide
+        instructions = call(system, A, "hello")["instructions"]
+        assert any("SKILL.md's bounded read-only first check" in text and "separate request" in text
+                   for text in instructions)
+
+
+@pytest.mark.asyncio
+async def test_published_pairing_capture_and_human_handoff(system):
+    """Instruction contract for observed agent mistakes, not background-host support."""
+    app = create_app(system.settings, system.repo, system.drive)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url=system.settings.url) as http:
+        guide = (await http.get("/SKILL.md")).text
+        pairing = guide.split("## 2. Request human approval", 1)[1].split("## 3. Call A2A", 1)[0]
+        pairing = " ".join(pairing.split())
+        for required in (
+            "resume reasoning without another user turn", "say ‘Done’",
+            "I can't check approval in the background", "unless a polling workflow is actually running",
+            "not the A2A contribution `monitor`", "cannot wake your host or complete pairing",
+            "device code, user code, exact origin, absolute ten-minute deadline",
+            "current poll interval privately", "original browser helper tab",
+            "message itself is not evidence of approval", "expired or state was lost",
+            "fresh pairing", "only one poller, at least five seconds",
+            "Prepare private capture before the first exchange", "without displaying it",
+            "atomically save the bearer and absolute expiry", "before returning only a safe status",
+            "Redacting a token in tool output does not save it", "later tool call",
+            "retain the captured response privately", "if it is lost, reconnect",
+            "error code: 1010", "not `authorization_pending`", "Stop unchanged retries",
+            "do not bypass host egress policy or weaken service security",
+        ):
+            assert required in pairing, required
+        assert pairing.index("Before handing off") < pairing.index("After waiting at least")
+        assert pairing.index("Prepare private capture") < pairing.index("POST to the [pairing exchange]")
+        assert "Identify each tool by its `action` field" in guide
+        assert re.search(r'“Done”.*handoff above', guide)
+        assert "A live monitor does **not** wake an agent's reasoning by itself" in guide
+        # Confirm the schema identifier against real hello, not an invented guide convention.
+        tools = call(system, A, "hello")["tools"]
+        assert tools and all("action" in tool and "input_schema" in tool for tool in tools)
+
+
+@pytest.mark.asyncio
+async def test_published_inference_trust_prerequisite_and_saved_skill(system):
+    """Instruction ordering/content contract, not provider detection or LLM compliance."""
+    app = create_app(system.settings, system.repo, system.drive)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url=system.settings.url) as http:
+        guide = (await http.get("/SKILL.md")).text
+        trust_start = guide.index("## Before connecting: use an approved AI environment")
+        assert trust_start < guide.index("## Onboarding:") < guide.index("POST to [start pairing]")
+        assert trust_start < guide.index("## 3. Call A2A and discover tools") < guide.index("### First read-only check")
+        trust = guide[trust_start:guide.index("## Onboarding:")]
+        for required in (
+            "pairing, loading or using credentials", "metadata/file reads",
+            "every new or reconnected agent", "provider/model routing or data handling changes",
+            "same approved processing boundary", "stored bearer", "saved local",
+            "user explicitly identifies this environment as trusted", "available policy",
+            "before transmitting protected information", "known to be untrusted",
+            "abort setup or ongoing operations", "UCSC email/login or model",
+            "not a verified technical", "cannot\ndetect or enforce",
+            "do not load a private credential to test", "stop local polling/streams",
+            "already-fetched contents", "previously processed data cannot be undone",
+            "appropriate secure process", "untrusted one",
+        ):
+            assert required in trust, required
+        # Extract what the guide requires hosts to save, not just surrounding prose.
+        reconnect = guide.split("### Make future checks easy\n", 1)[1].split("### Catch up", 1)[0]
+        saved = "\n".join(line[2:] for line in reconnect.splitlines() if line.startswith("> "))
+        for required in (
+            "Before pairing, loading/using credentials", "metadata/file",
+            "every new/reconnected session", "same approved", "Old consent, credentials",
+            "If unknown, pause", "known untrusted, abort", "Public guide/card fetches",
+            "never load a private credential", "stop calls, reading and local polling/streams",
+            "Previously processed data cannot be undone", "appropriate secure process",
+            "Browser fallback", "not server provider enforcement",
+        ):
+            assert required in saved, required
+        assert reconnect.index("> Before pairing") < reconnect.index("fetch the current guide and Agent Card")
+        assert reconnect.index("under that trusted approval") < reconnect.index("fresh `hello`")
+        browser = guide.split("## Browser-runtime fallback:", 1)[1]
+        assert browser.index("First satisfy the AI-environment prerequisite") < browser.index("```javascript")
+        assert "local browser does not make remotely processed notes local" in " ".join(browser.split())
+        instructions = call(system, A, "hello")["instructions"]
+        assert "Before any further cubby operation" in instructions[0]
+        assert "unknown trust means pause, known untrusted means abort" in instructions[0]
+        assert "not server enforcement" in instructions[0]
+        # No provider assertion is introduced into the protocol or public human landing.
+        root = (await http.get("/")).text
+        assert "Before connecting: use an approved AI environment" not in root
+
+
+@pytest.mark.asyncio
 async def test_browser_guide_javascript_against_actual_api(system, monkeypatch):
     """Run the served JS with Node, routing fetch through the real offline ASGI app."""
     origin = "https://cubby.bayleaf.dev"
@@ -522,7 +664,7 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
         pointer = (await http.get("/llms.txt")).text
         assert system.settings.url + "/SKILL.md" in pointer and len(pointer) < 200
         token = credential(system, A)
-        assert (await http.post("/a2a", json={"method": "GetTask"}, headers={"Authorization": "Bearer " + token})).status_code == 400
+        assert (await http.post("/a2a", json={"method": "ListTasks"}, headers={"Authorization": "Bearer " + token})).status_code == 400
         assert (await http.post("/auth/token", content=b"x" * 128001)).status_code == 413
         pairing = (await http.post("/auth/device")).json()
         pending = await http.post("/auth/token", data={"user_code": pairing["user_code"], "device_code": pairing["device_code"]})

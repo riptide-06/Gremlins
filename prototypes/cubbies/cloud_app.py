@@ -10,6 +10,7 @@ from pathlib import Path
 import secrets
 import time
 import hmac
+from datetime import datetime, timezone
 
 from authlib.integrations.starlette_client import OAuth
 from a2a.helpers import get_message_text, new_text_message
@@ -18,6 +19,8 @@ from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
+from a2a.types import Task, TaskStatus, TaskState, Artifact, Part
+from a2a.utils.errors import TaskNotFoundError, TaskNotCancelableError, InvalidParamsError
 from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, PlainTextResponse
@@ -30,6 +33,7 @@ logger = logging.getLogger("cubbies")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 CALLER = ContextVar("cubby_caller", default=None)
+BEARER = ContextVar("cubby_bearer", default=None)
 
 
 def campus_claims(claims, service):
@@ -197,10 +201,18 @@ class ProtocolGuard:
                 break
         try:
             rpc = json.loads(body)
-            if not isinstance(rpc, dict) or rpc.get("method") != "SendMessage":
+            if not isinstance(rpc, dict) or rpc.get("method") not in {"SendMessage", "SendStreamingMessage", "GetTask", "CancelTask", "SubscribeToTask"}:
                 raise ValueError()
-        except (ValueError, TypeError):
-            await JSONResponse({"error": "Only A2A 1.0 SendMessage is supported. No task lookup or subscriptions."}, status_code=400)(scope, receive, send)
+            if rpc["method"] in {"SendMessage", "SendStreamingMessage"}:
+                params = rpc.get("params", {})
+                message = params.get("message", {})
+                if (message.get("taskId") or message.get("contextId") or message.get("referenceTaskIds") or
+                        message.get("task_id") or message.get("context_id") or message.get("reference_task_ids") or
+                        params.get("configuration", {}).get("task_push_notification_config") or
+                        params.get("configuration", {}).get("taskPushNotificationConfig")):
+                    raise ValueError()
+        except (ValueError, TypeError, AttributeError):
+            await JSONResponse({"error": "Use A2A 1.0 SendMessage, GetTask, CancelTask or SubscribeToTask. New messages cannot reference tasks/contexts or request push."}, status_code=400)(scope, receive, send)
             return
         first = True
 
@@ -212,10 +224,139 @@ class ProtocolGuard:
             return await receive()
 
         marker = CALLER.set(caller)
+        credential = BEARER.set(auth[7:].decode("ascii"))
         try:
             await self.app(scope, replay, send)
         finally:
             CALLER.reset(marker)
+            BEARER.reset(credential)
+
+
+class MonitorHandler(DefaultRequestHandler):
+    """Durable, request-driven monitors: no in-memory worker survives a request.
+
+    SDK types/routes own the wire protocol. Immediate tools retain the default
+    executor. Monitor records hold metadata only, never the initiating message.
+    """
+    stream_seconds = 20
+
+    def __init__(self, service, auth, card):
+        super().__init__(agent_executor=Executor(service), task_store=InMemoryTaskStore(), agent_card=card)
+        self.service, self.auth = service, auth
+
+    def key(self, task_id):
+        if not isinstance(task_id, str) or not 1 <= len(task_id) <= 100:
+            raise TaskNotFoundError()
+        return digest(CALLER.get() + "\n" + task_id)
+
+    def render(self, data):
+        status = TaskStatus(state=data["state"])
+        status.timestamp.FromJsonString(data["updated"])
+        task = Task(id=data["id"], context_id=data["context_id"], status=status)
+        task.metadata.update({"cursor": data["cursor"], "deadline": data["deadline"],
+                              "scope": "confirmed contribution deliveries only"})
+        if data.get("result"):
+            task.artifacts.append(Artifact(artifact_id="changes", name="Contribution changes",
+                parts=[Part(text=json.dumps(data["result"]))]))
+        return task
+
+    async def on_message_send(self, params, context):
+        # Protobuf JSON accepts both snake_case and camelCase field names. Check
+        # the parsed SDK object too, before entering its process-global registry.
+        if (params.message.task_id or params.message.context_id or params.message.reference_task_ids or
+                params.configuration.HasField("task_push_notification_config")):
+            raise InvalidParamsError(message="Start a new message without task/context references or push configuration.")
+        try:
+            request = json.loads(get_message_text(params.message))
+        except (ValueError, TypeError):
+            return await super().on_message_send(params, context)
+        if not isinstance(request, dict) or request.get("action") != "monitor":
+            return await super().on_message_send(params, context)
+        try:
+            if set(request) - {"action", "cursor", "wait_seconds"}:
+                raise Fault("Unknown monitor arguments. Consult hello.")
+            wait = request.get("wait_seconds", "60")
+            if not isinstance(wait, str) or not wait.isascii() or not wait.isdigit() or not 1 <= len(wait) <= 3 or not 1 <= int(wait) <= 300:
+                raise Fault("wait_seconds must be a string integer from 1 to 300.")
+            cursor = request.get("cursor", "")
+            if not isinstance(cursor, str):
+                raise Fault("cursor must be a string.")
+            caller = CALLER.get()
+            initial = await asyncio.to_thread(self.service.changes, caller, cursor, "100", "beginning" if cursor else "now")
+            task_id = secrets.token_urlsafe(24)
+            data = {"id": task_id, "context_id": secrets.token_urlsafe(24), "owner": caller,
+                    "cursor": cursor or initial["cursor"], "deadline": time.time() + int(wait),
+                    "expires": time.time() + 7 * 86400, "updated": now(),
+                    "state": TaskState.TASK_STATE_WORKING}
+            data["expires_at"] = datetime.fromtimestamp(data["expires"], timezone.utc)
+            if initial["events"]:
+                data.update(state=TaskState.TASK_STATE_COMPLETED, result=initial)
+            await asyncio.to_thread(self.service.repo.put, "monitors", self.key(task_id), data)
+            return self.render(data)
+        except Fault as exc:
+            return new_text_message(json.dumps({"ok": False, "error": str(exc)}))
+
+    async def read(self, task_id, cancel=False):
+        key, caller = self.key(task_id), CALLER.get()
+        data = await asyncio.to_thread(self.service.repo.get, "monitors", key)
+        if data and data.get("owner") == caller and data["expires"] <= time.time():
+            await asyncio.to_thread(self.service.repo.delete, "monitors", key)
+            raise TaskNotFoundError()
+        if not data or data.get("owner") != caller or data["expires"] <= time.time():
+            raise TaskNotFoundError()
+        result = None
+        if not cancel and data["state"] == TaskState.TASK_STATE_WORKING:
+            result = await asyncio.to_thread(self.service.changes, caller, data["cursor"])
+        def update(current):
+            if not current or current.get("owner") != caller or current["expires"] <= time.time():
+                raise TaskNotFoundError()
+            if cancel:
+                if current["state"] != TaskState.TASK_STATE_WORKING:
+                    raise TaskNotCancelableError()
+                current.update(state=TaskState.TASK_STATE_CANCELED, updated=now())
+            elif current["state"] == TaskState.TASK_STATE_WORKING and result is not None:
+                if result["events"] or current["deadline"] <= time.time():
+                    current.update(state=TaskState.TASK_STATE_COMPLETED, result=result, updated=now())
+            return current, current
+        data = await asyncio.to_thread(self.service.repo.change, "monitors", key, update)
+        return self.render(data)
+
+    async def on_get_task(self, params, context):
+        if params.HasField("history_length") and params.history_length < 0:
+            raise InvalidParamsError(message="historyLength must be nonnegative")
+        return await self.read(params.id)
+
+    async def on_cancel_task(self, params, context):
+        return await self.read(params.id, cancel=True)
+
+    async def on_message_send_stream(self, params, context):
+        result = await self.on_message_send(params, context)
+        yield result
+        if isinstance(result, Task) and result.status.state == TaskState.TASK_STATE_WORKING:
+            from a2a.types import SubscribeToTaskRequest
+            first = True
+            async for event in self.on_subscribe_to_task(SubscribeToTaskRequest(id=result.id), context):
+                if first:
+                    first = False
+                    continue
+                yield event
+
+    async def on_subscribe_to_task(self, params, context):
+        # Each reconnect authorizes afresh. Recheck credentials during the bounded
+        # stream as well; revocation/expiry ends it without returning more metadata.
+        deadline = time.monotonic() + self.stream_seconds
+        task = await self.read(params.id)
+        yield task
+        while task.status.state == TaskState.TASK_STATE_WORKING and time.monotonic() < deadline:
+            await asyncio.sleep(1)
+            if time.monotonic() >= deadline:
+                return
+            if await asyncio.to_thread(self.auth.authorize, BEARER.get()) != CALLER.get():
+                return
+            updated = await self.read(params.id)
+            if updated.status.state != task.status.state:
+                yield updated
+            task = updated
 
 
 def page(title, body, discovery=False):
@@ -363,13 +504,13 @@ def create_app(settings=None, repo=None, drive=None):
     async def health(request):
         return JSONResponse({"ok": True})
 
-    card = AgentCard(name="Campus Cubbies", version="0.4.0",
+    card = AgentCard(name="Campus Cubbies", version="0.5.0",
         description="Organize your UCSC Drive cubby and exchange attributed notes with permitted campus contributors. No model runs here.",
         documentation_url=settings.url + "/SKILL.md",
-        default_input_modes=["text/plain"], default_output_modes=["text/plain"], capabilities=AgentCapabilities(streaming=False),
+        default_input_modes=["text/plain"], default_output_modes=["text/plain"], capabilities=AgentCapabilities(streaming=True),
         supported_interfaces=[AgentInterface(url=settings.url + "/a2a", protocol_binding="JSONRPC", protocol_version="1.0")],
         skills=[AgentSkill(id="cubby", name="Campus Cubby tools", description="Use when managing your personal campus notes or sending an update to someone who permits you to contribute.", tags=["cubby", "correspondence"])])
-    handler = DefaultRequestHandler(agent_executor=Executor(service), task_store=InMemoryTaskStore(), agent_card=card)
+    handler = MonitorHandler(service, auth, card)
     app = Starlette(routes=[Route("/", home), Route("/connect", connect), Route("/login", login, methods=["POST"]),
         Route("/auth/callback", callback), Route("/auth/device", device, methods=["POST"]), Route("/auth/token", exchange, methods=["POST"]),
         Route("/SKILL.md", skill), Route("/llms.txt", llms), Route("/health", health), Route("/healthz", health),
