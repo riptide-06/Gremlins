@@ -2,7 +2,11 @@
 !Dockerfile
 !pyproject.toml
 !uv.lock
-!cloud_app.py
-!gremlin_client.py
-!gremlin_slim.py
-!SLIM.md
+!prototypes/
+prototypes/*
+!prototypes/cubbies/
+prototypes/cubbies/*
+!prototypes/cubbies/cloud_app.py
+!prototypes/cubbies/cubbies.py
+!prototypes/cubbies/cubby_drive.py
+!prototypes/cubbies/SKILL.md

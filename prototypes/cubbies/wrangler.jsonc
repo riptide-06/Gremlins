@@ -1,0 +1,11 @@
+{
+  "name": "campus-cubbies-domain",
+  "account_id": "1a49fb69291d42e23c4ed4dcffce5bbc",
+  "main": "domain-proxy.mjs",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "preview_urls": false,
+  "logpush": false,
+  "observability": { "enabled": false },
+  "routes": [{ "pattern": "cubby.bayleaf.dev", "custom_domain": true }]
+}
