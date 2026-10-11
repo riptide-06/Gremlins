@@ -471,7 +471,7 @@ SendMessage {"session_id","question","context"}</pre>
   function api(path, body){
     var opt = { headers: {'X-Gremlin': '1', 'Content-Type': 'application/json'}, credentials: 'same-origin' };
     if (body !== undefined) { opt.method = 'POST'; opt.body = JSON.stringify(body); }
-    return fetch(path, opt).then(function(r){ return r.json().then(function(j){ j.__status = r.status; if (j.reconnect) reconnect(j.error); return j; }); });
+    return fetch(path, opt).then(function(r){ return r.json().then(function(j){ j.__status = r.status; if (j.reconnect) reconnect(j.error); else if (r.status === 401 && j.signed_out && state.me && state.me.connected) reconnect('Your session ended (the server restarted or the cookie expired). Connect again.'); return j; }); });
   }
   function reconnect(why){
     // Campus Cubbies revoked or expired this connection: back to sign-in, with the reason.
@@ -740,7 +740,7 @@ SendMessage {"session_id","question","context"}</pre>
       else if (kind === 'error') got.error = data;
     };
     return fetch('/api/ask_stream', {method: 'POST', headers: {'X-Gremlin': '1', 'Content-Type': 'application/json'}, credentials: 'same-origin', body: JSON.stringify({question: question, declined: declined || []})}).then(function(r){
-      if (!r.ok || !r.body) return r.json().then(function(j){ got.error = j; });
+      if (!r.ok || !r.body) return r.json().then(function(j){ if (r.status === 401 && j.signed_out && state.me && state.me.connected) j = {error: 'Your session ended (the server restarted or the cookie expired). Connect again.', reconnect: true}; got.error = j; });
       var reader = r.body.getReader(), dec = new TextDecoder(), buf = '';
       var pump = function(){ return reader.read().then(function(x){
         if (x.done) return;

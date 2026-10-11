@@ -116,6 +116,22 @@ DEFAULT_BOX_DIR = str(Path(__file__).with_name("docs") / "boxes")
 WORK_BOX_DIR = Path(__file__).with_name("out") / "boxes"
 
 
+def local_session_secret() -> str:
+    """Without SESSION_SECRET, keep one generated secret under out/ (gitignored, mode 600) so a
+    restart does not sign every student out; a fresh random one only if that file cannot be kept."""
+    path = Path(__file__).with_name("out") / "session-secret"
+    try:
+        if path.exists() and len(path.read_text(encoding="utf-8").strip()) >= 32:
+            return path.read_text(encoding="utf-8").strip()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        secret = secrets.token_urlsafe(48)
+        path.write_text(secret, encoding="utf-8")
+        path.chmod(0o600)
+        return secret
+    except OSError:
+        return secrets.token_urlsafe(48)
+
+
 def working_boxes(box_dir: str) -> MarkdownBoxStore:
     """Every answer appends a session line to the department boxes and the judge's student box.
     When the boxes are the tracked ones under docs/, work on a copy under out/ (gitignored) so a
@@ -187,7 +203,8 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         return None
 
     def denied():
-        return JSONResponse({"error": "Sign in with your UCSC account through Campus Cubbies, open the judge link, or send your Campus Cubbies bearer."}, status_code=401)
+        return JSONResponse({"error": "Sign in with your UCSC account through Campus Cubbies, open the judge link, or send your Campus Cubbies bearer.",
+                             "signed_out": True}, status_code=401)
 
     async def body_of(request) -> dict:
         try:
@@ -518,7 +535,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
                             *mcp_routes],
                     lifespan=lambda _app: mcp.session_manager.run())
     app.add_middleware(McpGuard)
-    app.add_middleware(SessionMiddleware, secret_key=settings.session_secret or secrets.token_urlsafe(48),
+    app.add_middleware(SessionMiddleware, secret_key=settings.session_secret or local_session_secret(),
                        https_only=not settings.local_http, same_site="lax", max_age=172800)
     app.state.mcp = mcp
     app.state.boxes = boxes
