@@ -213,3 +213,51 @@ async def test_application_logs_redact_content_and_tokens(setup, caplog):
     assert "PRIVATE CONTENT CANARY" not in caplog.text
     assert alice["student"] not in caplog.text
     assert "REDACTED" in caplog.text
+
+
+# ---- judge mode: /demo?token= signs in as the synthetic demo student, /chat and /api/* work without Google ----
+def judge_app(tmp_path, brain):
+    import shutil
+    from box import MarkdownBoxStore
+    src = MarkdownBoxStore(Path(__file__).parent / "docs" / "boxes")
+    for name in ("iso", "cmpm", "college", "finaid", "student"):
+        shutil.copy(src.path(name), tmp_path / f"{name}.md")
+    settings = Settings(url="http://test", client_id="test-id", client_secret="test-secret", session_secret="test-session-secret",
+                        local_http=True, box_dir=str(tmp_path), demo_token="judge-token-123")
+    return create_app(settings, TestStore(), brain=brain)
+
+
+async def test_judge_mode_chat_and_api(tmp_path):
+    from brain import ScriptedBrain
+    answer = {"scope": "in_scope", "answer": "Twelve credits keeps you full time [F-01].", "cites": ["F-01"], "needs": [],
+              "options": [{"option": "Stay at 12 units", "conditions": [], "cites": ["F-01"], "units": 12, "hours": None, "weeks": 0}],
+              "confidence": 0.9}
+    app = judge_app(tmp_path, ScriptedBrain(default=answer))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+        assert (await http.get("/chat")).status_code == 303                       # not signed in
+        assert (await http.post("/api/ask", json={"question": "q"})).status_code == 401
+        assert "not open" in (await http.get("/demo?token=wrong")).text
+        r = await http.get("/demo?token=judge-token-123")
+        assert r.status_code == 303 and r.headers["location"] == "/chat"
+        chat = await http.get("/chat")
+        assert chat.status_code == 200 and "Gremlin Labs" in chat.text and "script-src 'unsafe-inline'" in chat.headers["content-security-policy"]
+        # the API needs the marker header (no cross-site form can send it)
+        assert (await http.post("/api/ask", json={"question": "q"})).status_code == 401
+        headers = {"X-Gremlin": "1", "Origin": "http://test"}
+        box = (await http.get("/api/box", headers=headers)).json()
+        assert "Asha Rao" in box["box"] and box["student"].startswith("demo")
+        v = (await http.post("/api/ask", json={"question": "Can I drop my 5-unit GE and go from 17 to 12 units?"}, headers=headers)).json()
+        assert v["verdict"] == "CONVERGED" and set(v["shared"]) == {"iso", "cmpm", "college", "finaid"}
+        assert "Asha" not in json.dumps(v) and "arao@" not in json.dumps(v)
+        assert (await http.post("/api/set", json={"field": "days_to_deadline", "value": "2"}, headers=headers)).json()["ok"] is True
+        assert (await http.post("/api/set", json={"field": "name", "value": "x"}, headers=headers)).status_code == 400
+        v2 = (await http.post("/api/ask", json={"question": "Can I drop my 5-unit GE and go from 17 to 12 units?"}, headers=headers)).json()
+        assert v2["verdict"] == "ESCALATED" and "E-02" in v2["escalations"]           # new information, same question
+        assert (await http.post("/api/approve", json={"field": "hours", "dept": "iso"}, headers=headers)).json()["ok"] is True
+        assert (await http.get("/api/open_items", headers=headers)).json() == []
+        # a signed-in student with no Google account never touched Firestore
+        assert not hasattr(app.state, "firestore_touched")
+
+
+def test_judge_mode_off_by_default(tmp_path):
+    assert Settings(box_dir=str(tmp_path)).demo_token == ""

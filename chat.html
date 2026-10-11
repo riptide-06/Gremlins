@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gremlin Labs</title>
+<style>
+:root{--bg:#f8f7f2;--ink:#1d1f27;--muted:#6b6f7c;--line:#1d1f27;--card:#fff;--orange:#F54E00;--yellow:#F7A501;--blue:#1D4AFF;--green:#B9E5A6;--red:#ff5c5c;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1.5px solid var(--line);background:#fff}
+header h1{font-size:18px;margin:0;letter-spacing:-.3px}
+header .tag{font:12px var(--mono);background:var(--yellow);border:1.5px solid var(--line);padding:2px 8px;border-radius:999px}
+header .spacer{flex:1}
+header a,header button{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none;box-shadow:2px 2px 0 var(--line)}
+main{display:grid;grid-template-columns:1fr 360px;gap:0;min-height:calc(100vh - 56px)}
+#left{padding:20px;max-width:900px;width:100%}
+#right{border-left:1.5px solid var(--line);background:#fff;padding:16px;overflow:auto;max-height:calc(100vh - 56px);position:sticky;top:56px}
+@media (max-width:980px){main{grid-template-columns:1fr}#right{position:static;max-height:none;border-left:0;border-top:1.5px solid var(--line)}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;margin:0 0 14px;box-shadow:3px 3px 0 var(--line)}
+.q{background:#fff7e8}
+.badge{display:inline-block;font:600 12px var(--mono);border:1.5px solid var(--line);border-radius:999px;padding:2px 10px;margin-right:6px}
+.CONVERGED{background:var(--green)}.ESCALATED{background:var(--orange);color:#fff}.DISPUTED{background:var(--yellow)}.ASK_STUDENT{background:var(--blue);color:#fff}.UNANSWERED{background:#ddd}
+.muted{color:var(--muted);font-size:13px}
+.mono{font:12.5px var(--mono)}
+.row{margin:8px 0}
+.opt{border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:#fafafa}
+.cite{font:11px var(--mono);background:#eef2ff;border:1px solid #c9d2ff;border-radius:4px;padding:0 4px;margin-left:2px}
+.dept{font:11px var(--mono);background:#f1f1f1;border:1px solid #ccc;border-radius:4px;padding:0 5px}
+form.ask{display:flex;gap:8px;margin:0 0 16px}
+form.ask input{flex:1;font:inherit;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;background:#fff;box-shadow:3px 3px 0 var(--line)}
+button.primary{font:inherit;font-weight:600;background:var(--orange);color:#fff;border:1.5px solid var(--line);border-radius:10px;padding:12px 16px;cursor:pointer;box-shadow:3px 3px 0 var(--line)}
+button.small{font:inherit;font-size:12px;background:#fff;border:1.5px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer;margin:2px 4px 2px 0;box-shadow:2px 2px 0 var(--line)}
+button.small.yes{background:var(--green)}
+.chips button{font:inherit;font-size:12px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:4px 10px;margin:0 6px 6px 0;cursor:pointer}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px var(--mono);background:#f4f4f0;border:1px solid #ddd;border-radius:8px;padding:10px;max-height:46vh;overflow:auto}
+h3{font-size:14px;margin:14px 0 6px}
+.brief dt{font:600 12px var(--mono);margin-top:6px}.brief dd{margin:0 0 4px 0}
+.set{display:flex;gap:6px;margin:8px 0}.set input{font:12px var(--mono);border:1.5px solid var(--line);border-radius:6px;padding:4px 6px;width:46%}
+#status{font:12px var(--mono);color:var(--muted)}
+.gremlin{width:34px;height:34px}
+</style>
+<header>
+  <svg class="gremlin" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="38" rx="20" ry="18" fill="#B9E5A6" stroke="#1d1f27" stroke-width="2.5"/><path d="M14 26 L10 8 L24 20 Z M50 26 L54 8 L40 20 Z" fill="#B9E5A6" stroke="#1d1f27" stroke-width="2.5" stroke-linejoin="round"/><circle cx="25" cy="36" r="4" fill="#fff" stroke="#1d1f27" stroke-width="2"/><circle cx="39" cy="36" r="4" fill="#fff" stroke="#1d1f27" stroke-width="2"/><circle cx="26" cy="37" r="1.6" fill="#1d1f27"/><circle cx="40" cy="37" r="1.6" fill="#1d1f27"/><path d="M24 46 Q32 52 40 46" fill="none" stroke="#1d1f27" stroke-width="2.5" stroke-linecap="round"/></svg>
+  <h1>Gremlin Labs</h1>
+  <span class="tag" id="who">student</span>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <a href="/" title="Credentials and MCP setup">connect your own agent</a>
+</header>
+<main>
+<div id="left">
+  <form class="ask" id="askform">
+    <input id="q" autocomplete="off" placeholder="Ask about units, visas, aid, your major... the gremlins answer only from their boxes" required>
+    <button class="primary" id="go">Ask</button>
+  </form>
+  <div class="chips" id="chips"></div>
+  <div id="log"></div>
+</div>
+<aside id="right">
+  <h3 style="margin-top:0">My cubby <span class="muted">(only your gremlin reads this)</span></h3>
+  <div class="set"><input id="setk" placeholder="field, e.g. days_to_deadline"><input id="setv" placeholder="value, e.g. 2"><button class="small" id="setgo">set</button></div>
+  <p class="muted" style="margin:4px 0 8px">Change a field and ask the same question again: new information changes the verdict.</p>
+  <pre id="box">loading...</pre>
+  <h3>Open items</h3>
+  <div id="open" class="muted">none</div>
+</aside>
+</main>
+<script>
+(function(){
+  var SUGGEST = [
+    "Can I drop my 5-unit GE and go from 17 to 12 units?",
+    "My college adviser approved me to take 10 units this quarter, so I can drop to 10, right?",
+    "I've been dealing with a health issue and can't handle 17 units. What can I do?",
+    "Can I take a second on-campus job, 12 more hours a week?",
+    "Should I add CMPM 120 now and go to 22 units, or wait until next year?",
+    "I graduate in June 2027. When can I apply for OPT and what do I need to do before?",
+    "What's the best ramen near campus?"
+  ];
+  var log = document.getElementById('log'), q = document.getElementById('q'), status = document.getElementById('status');
+  var chips = document.getElementById('chips');
+  SUGGEST.forEach(function(s){ var b=document.createElement('button'); b.type='button'; b.textContent=s; b.onclick=function(){ q.value=s; ask(s); }; chips.appendChild(b); });
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function cites(list){ return (list||[]).map(function(c){ return '<span class="cite">'+esc(c)+'</span>'; }).join(''); }
+  function api(path, body){
+    var opt = {headers:{'X-Gremlin':'1','Content-Type':'application/json'}, credentials:'same-origin'};
+    if (body){ opt.method='POST'; opt.body=JSON.stringify(body); }
+    return fetch(path, opt).then(function(r){ if(r.status===401){ location.href='/'; } return r.json(); });
+  }
+  function refreshBox(){
+    api('/api/box').then(function(d){ document.getElementById('box').textContent = d.box || d.error || ''; document.getElementById('who').textContent = d.student || 'student'; });
+    api('/api/open_items').then(function(items){
+      var el=document.getElementById('open'); if(!items||!items.length){ el.textContent='none'; return; }
+      el.innerHTML = items.map(function(i){ return '<div class="row"><span class="dept">'+esc(i.dept)+'</span> needs <b>'+esc(i.fields.join(', '))+'</b> for: '+esc(i.question)+'</div>'; }).join('');
+    });
+  }
+  function render(v, question){
+    var html = '<div class="card q"><b>You:</b> '+esc(question)+'</div>';
+    html += '<div class="card"><div class="row"><span class="badge '+esc(v.verdict)+'">'+esc(v.verdict)+'</span>';
+    if (v.authority) html += '<span class="muted">decided at <b>'+esc(v.authority)+'</b> authority</span>';
+    html += '</div>';
+    var depts = Object.keys(v.shared||{});
+    html += '<div class="row muted">asked: '+depts.map(function(d){return '<span class="dept">'+esc(d)+'</span>';}).join(' ')+(depts.length?'':'nobody')+'</div>';
+    if (v.answer) html += '<div class="row">'+esc(v.answer).replace(/\[([FPQE]-\d+)\]/g,'<span class="cite">$1</span>')+'</div>';
+    if (v.options && v.options.length){
+      html += '<div class="row"><b>Options, ranked by your preferences</b></div>';
+      v.options.forEach(function(o){
+        var attrs=['units','hours','weeks'].filter(function(k){return o[k]!=null;}).map(function(k){return k+'='+o[k];}).join(', ');
+        html += '<div class="opt">'+o.rank+'. '+esc(o.option)+' <span class="dept">'+esc(o.dept||'')+'</span> '+cites(o.cites)+(attrs?' <span class="muted">('+esc(attrs)+')</span>':'')+(o.conditions&&o.conditions.length?'<div class="muted">if: '+esc(o.conditions.join('; '))+'</div>':'')+'</div>';
+      });
+    }
+    if (v.ask && v.ask.length){
+      html += '<div class="row"><b>A department needs more from you</b> <span class="muted">(nothing was shared yet)</span></div>';
+      depts.forEach(function(d){
+        (v.ask_by_dept && v.ask_by_dept[d] || []).forEach(function(f){
+          html += '<button class="small yes" data-approve="'+esc(f)+'" data-dept="'+esc(d)+'" data-q="'+esc(question)+'">share '+esc(f)+' with '+esc(d.toUpperCase())+' and re-ask</button>';
+        });
+      });
+    }
+    if (v.brief && Object.keys(v.brief).length){
+      html += '<dl class="brief">';
+      Object.keys(v.brief).forEach(function(k){ var val=v.brief[k]; html += '<dt>'+esc(k)+'</dt><dd>'+esc(Array.isArray(val)?val.join('; '):val)+'</dd>'; });
+      html += '</dl>';
+    }
+    if (v.escalations && v.escalations.length) html += '<div class="row muted">triggers fired in code: '+cites(v.escalations)+'</div>';
+    html += '<div class="row muted">what left your box: '+depts.map(function(d){ return '<span class="dept">'+esc(d)+'</span> '+esc((v.shared[d]||[]).join(', ')||'nothing'); }).join(' &nbsp; ')+'</div>';
+    if (v.dropped) html += '<div class="row muted">the wall dropped '+v.dropped+' uncited claim(s) before you saw this</div>';
+    html += '</div>';
+    var el=document.createElement('div'); el.innerHTML=html; log.prepend(el);
+    el.querySelectorAll('button[data-approve]').forEach(function(b){
+      b.onclick=function(){ status.textContent='approving...'; api('/api/approve',{field:b.dataset.approve,dept:b.dataset.dept}).then(function(){ ask(b.dataset.q); }); };
+    });
+  }
+  function ask(question){
+    status.textContent='gremlins are reading their boxes...'; document.getElementById('go').disabled=true;
+    api('/api/ask',{question:question}).then(function(v){
+      if (v.error){ status.textContent=v.error; return; }
+      render(v, question); status.textContent=''; refreshBox();
+    }).catch(function(e){ status.textContent='error: '+e; }).then(function(){ document.getElementById('go').disabled=false; });
+  }
+  document.getElementById('askform').onsubmit=function(e){ e.preventDefault(); if(q.value.trim()) ask(q.value.trim()); };
+  document.getElementById('setgo').onclick=function(){
+    var k=document.getElementById('setk').value.trim(), v=document.getElementById('setv').value.trim(); if(!k) return;
+    api('/api/set',{field:k,value:v}).then(function(d){ status.textContent=d.ok?'set '+k+' = '+v:(d.error||'not set'); refreshBox(); });
+  };
+  refreshBox();
+})();
+</script>
+</html>

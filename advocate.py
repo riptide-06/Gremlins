@@ -93,6 +93,7 @@ class Verdict:
         return {"verdict": self.kind, "session_id": self.session_id, "question": self.question,
                 "answer": self.answer, "best": self.best, "options": self.options, "cites": self.cites,
                 "authority": self.authority, "escalations": self.escalations, "ask": self.ask,
+                "ask_by_dept": {d.dept: d.ask for d in self.depts if d.ask},
                 "shared": self.shared, "dropped": self.dropped, "brief": self.brief,
                 "written": [{"section": s, "line": l} for s, l in self.written]}
 

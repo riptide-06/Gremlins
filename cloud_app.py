@@ -15,6 +15,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import secrets
 
 from authlib.integrations.starlette_client import OAuth
@@ -64,6 +65,10 @@ class Settings:
     local_http: bool = os.getenv("LOCAL_HTTP") == "1"
     box_dir: str = os.getenv("BOX_DIR", str(Path(__file__).with_name("docs") / "boxes"))
     iso_url: str = os.getenv("ISO_URL", "")  # empty: ISO gremlin runs in-process
+    # Judge mode: /demo?token=<DEMO_TOKEN> signs a visitor in as the synthetic demo student
+    # (box `student`, no Google account, no Firestore). Empty token: judge mode is off.
+    demo_token: str = os.getenv("DEMO_TOKEN", "")
+    demo_box: str = os.getenv("DEMO_BOX", "student")
 
 
 class FirestoreMemory:
@@ -269,8 +274,12 @@ def page(title, body):
 <div class="muted">GREMLIN · IN YOUR CORNER</div><h1>""" + escape(title) + "</h1>" + body + "</html>", headers={"Cache-Control": "no-store", "Referrer-Policy": "same-origin", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
 
 
-def student_box_name(uid):
-    return "student-" + uid[:32]
+DEMO_UID = "demo"
+_FIELD = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+
+
+def student_box_name(uid, demo_box="student"):
+    return demo_box if uid == DEMO_UID else "student-" + uid[:32]
 
 
 class McpGuard:
@@ -326,7 +335,101 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
     depts = build_depts(boxes, brain, urls)
 
     def advocate_for(uid):
-        return Advocate(store=boxes, student_box=student_box_name(uid), depts=depts)
+        return Advocate(store=boxes, student_box=student_box_name(uid, settings.demo_box), depts=depts)
+
+    async def api_uid(request):
+        """Who is calling /api: a signed-in session (same-origin, marked request) or a student bearer."""
+        uid = request.session.get("uid")
+        if uid:
+            origin = request.headers.get("origin") or request.headers.get("referer", "")
+            if request.headers.get("x-gremlin") != "1" or (origin and not origin.startswith(settings.url)):
+                return None
+            return uid
+        auth = request.headers.get("authorization", "")
+        raw = auth[7:] if auth.startswith("Bearer ") else ""
+        if 32 <= len(raw) <= 128:
+            caller = await asyncio.to_thread(store.authorize, raw)
+            if caller and caller["role"] == "student":
+                return caller["uid"]
+        return None
+
+    def denied():
+        return JSONResponse({"error": "Sign in with your UCSC account, open the judge link, or use a student bearer credential."}, status_code=401)
+
+    async def demo(request):
+        token = request.query_params.get("token", "")
+        if not settings.demo_token or not hmac.compare_digest(token, settings.demo_token):
+            return page("Judge mode is not open.", '<p>Ask the team for the judge link, or <a href="/">sign in with your UCSC account</a>.</p>')
+        request.session.clear()
+        request.session.update({"uid": DEMO_UID, "csrf": secrets.token_urlsafe(32)})
+        emit("demo_login")
+        return RedirectResponse("/chat", status_code=303)
+
+    async def chat(request):
+        if not request.session.get("uid"):
+            return RedirectResponse("/", status_code=303)
+        html = Path(__file__).with_name("chat.html").read_text(encoding="utf-8")
+        return HTMLResponse(html, headers={"Cache-Control": "no-store", "Referrer-Policy": "same-origin",
+                                           "X-Content-Type-Options": "nosniff",
+                                           "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'"})
+
+    async def api_ask(request):
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        try:
+            body = await request.json()
+        except ValueError:
+            return JSONResponse({"error": "JSON body required"}, status_code=400)
+        question = str((body or {}).get("question", "")).strip()[:4000]
+        if not question:
+            return JSONResponse({"error": "question is required"}, status_code=400)
+        emit("api_ask", demo=uid == DEMO_UID)
+        verdict = await advocate_for(uid).ask(question)
+        return JSONResponse(verdict.to_dict())
+
+    async def api_approve(request):
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        body = await request.json()
+        field_name, dept = str(body.get("field", "")).strip(), str(body.get("dept", "")).strip()
+        if not _FIELD.match(field_name) or not _FIELD.match(dept):
+            return JSONResponse({"ok": False, "error": "bad field or dept"}, status_code=400)
+        from wall import approve as wall_approve
+        adv = advocate_for(uid)
+        ok = await asyncio.to_thread(wall_approve, adv.store, adv.student_box, field_name, dept)
+        return JSONResponse({"ok": ok, "field": field_name, "dept": dept})
+
+    async def api_box(request):
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        adv = advocate_for(uid)
+        text = adv.store.load(adv.student_box).text
+        return JSONResponse({"box": text[:100_000], "student": "demo student (synthetic)" if uid == DEMO_UID else "you"})
+
+    async def api_set(request):
+        """Change one profile field (section 1) so the same question can be asked on new information."""
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        body = await request.json()
+        field_name, value = str(body.get("field", "")).strip(), str(body.get("value", "")).strip()[:120]
+        if not _FIELD.match(field_name) or "\n" in value or field_name in ("name", "email"):
+            return JSONResponse({"ok": False, "error": "bad field"}, status_code=400)
+        adv = advocate_for(uid)
+        try:
+            await asyncio.to_thread(adv.store.set_field, adv.student_box, field_name, value)
+        except KeyError:
+            await asyncio.to_thread(adv.store.append, adv.student_box, 1, f"{field_name}: {value}")
+        return JSONResponse({"ok": True, "field": field_name, "value": value})
+
+    async def api_open_items(request):
+        uid = await api_uid(request)
+        if not uid:
+            return denied()
+        return JSONResponse(advocate_for(uid).open_items())
 
     def form(request, action, label):
         csrf = request.session.setdefault("csrf", secrets.token_urlsafe(32))
@@ -349,6 +452,7 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
             body += '<section><h2>Optional: invite an advisor agent</h2><p class="muted">Share only this block with an outside contributor. It cannot read your notebook.</p><pre>' + escape(advisor) + '</pre></section>'
         body += '<section><h2>Agent credentials</h2><p>Generating new credentials replaces both previous credentials. Revoking them preserves your memory but blocks agent access.</p>'
         body += form(request, "/credentials", "Generate new connection instructions") + form(request, "/revoke", "Revoke agent access") + '</section>'
+        body += '<section><h2>Ask your gremlin here</h2><p>No agent of your own yet? <a class="button" href="/chat">Open the chat</a></p></section>'
         body += '<section><h2>Your advocate over MCP</h2><p>Add a custom connector in Claude at <code>' + escape(settings.url) + '/mcp</code> with header <code>Authorization: Bearer &lt;your student token&gt;</code>. Tools: ask, my_box, approve_share, open_items.</p></section>'
         body += '<section><h2>Optional: A2A over SLIM</h2><p>Use a local SLIM gateway with the same role credentials. No public SLIM relay is hosted here.</p><a href="/SLIM.md">Laptop setup instructions</a> · <a href="/gremlin_slim.py">Download SLIM gateway and client</a></section>'
         body += '<p class="muted">Hackathon pilot: use synthetic information, not health, immigration, or other sensitive records. Memory is stored in this project’s Firestore database, accessible to its administrators. This is not an approved campus advising service.</p>'
@@ -449,6 +553,9 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
                     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
     mcp_routes = mcp.streamable_http_app().routes  # the /mcp route; its session manager runs in our lifespan
     app = Starlette(routes=[Route("/", home), Route("/login", login), Route("/auth/callback", callback),
+                            Route("/demo", demo), Route("/chat", chat),
+                            Route("/api/ask", api_ask, methods=["POST"]), Route("/api/approve", api_approve, methods=["POST"]),
+                            Route("/api/set", api_set, methods=["POST"]), Route("/api/box", api_box), Route("/api/open_items", api_open_items),
                             Route("/credentials", credentials, methods=["POST"]), Route("/revoke", revoke, methods=["POST"]),
                              Route("/logout", logout, methods=["POST"]), Route("/gremlin_client.py", download), Route("/health", health), Route("/healthz", health),
                              Route("/gremlin_slim.py", slim_download), Route("/SLIM.md", slim_instructions),

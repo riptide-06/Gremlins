@@ -6,3 +6,15 @@
 !gremlin_client.py
 !gremlin_slim.py
 !SLIM.md
+!box.py
+!brain.py
+!dept_gremlin.py
+!wall.py
+!advocate.py
+!mcp_server.py
+!chat.html
+!docs
+docs/*
+!docs/boxes
+docs/boxes/student-*.md
+docs/boxes/*.example.md
