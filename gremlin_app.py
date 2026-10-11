@@ -462,7 +462,21 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
     async def home(request):
         if request.session.get("uid"):
             return dashboard(request)
-        return page("Bring your own agent.", '<p>A private memory capability for your existing agent, with a separate contribution-only role for advisors.</p><section><h2>Start with your UCSC account</h2><p>Sign in to get copy-pasteable connection instructions. No Google Docs permissions are requested.</p><a class="button" href="/login">Sign in with Google</a></section><p class="muted">UCSC-account access does not mean university endorsement. Synthetic-data hackathon pilot only.</p>')
+        url = escape(settings.url)
+        return page("Three offices. Three answers. One gremlin that tells you who decides.",
+            '<p>Gremlins is a student-controlled advocate for UCSC. Department gremlins answer only from their own policy box and cite every claim. '
+            'Your gremlin asks the departments that matter, shares only what you allowed, applies precedence in code, and comes back with '
+            '<b>CONVERGED</b>, <b>DISPUTED</b>, <b>ESCALATED</b>, <b>ASK_STUDENT</b>, or <b>UNANSWERED</b>. Built on Campus Cubbies and AGNTCY A2A.</p>'
+            '<section><h2>Students: sign in with your UCSC account</h2><p>You get a chat, a cubby seeded from the template, and a token for your own agent. No Google Docs permissions are requested.</p>'
+            '<a class="button" href="/login">Sign in with Google</a></section>'
+            '<section><h2>Judges: use the link the team gave you</h2><p>It opens the chat as a synthetic student (Asha Rao, F-1, 17 units, CS: Game Design). Try: '
+            '<i>My college adviser approved me to take 10 units, so I can drop to 10, right?</i> Then change <code>days_to_deadline</code> to 2 in the cubby panel and ask again.</p></section>'
+            '<section><h2>Bring your own agent</h2><p>After signing in, add <code>' + url + '/mcp</code> as an MCP connector with <code>Authorization: Bearer &lt;your token&gt;</code>. '
+            'Tools: <code>ask</code>, <code>my_box</code>, <code>approve_share</code>, <code>open_items</code>. Or run it locally:</p>'
+            '<pre>git clone https://github.com/riptide-06/Gremlins && cd Gremlins && uv sync\nclaude mcp add gremlin -- uv run --directory $PWD mcp_server.py</pre>'
+            '<p class="muted">Department gremlins are A2A agents (<code>uv run dept_gremlin.py serve --dept iso --port 10001</code>); the ISO leg can travel over AGNTCY SLIM.</p></section>'
+            '<p class="muted">Synthetic-data hackathon pilot. UCSC-account access does not mean university endorsement. '
+            'Source: <a href="https://github.com/riptide-06/Gremlins">github.com/riptide-06/Gremlins</a></p>')
 
     async def login(request):
         if not settings.client_id or not settings.client_secret or not settings.session_secret:
