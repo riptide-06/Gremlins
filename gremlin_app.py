@@ -193,7 +193,7 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         caller = session_caller(request)
         if caller:
             origin = request.headers.get("origin") or request.headers.get("referer", "")
-            if request.headers.get("x-gremlin") != "1" or (origin and not origin.startswith(settings.url)):
+            if request.headers.get("x-gremlin") != "1" or (origin and not same_site(origin)):
                 return None
             return caller
         auth = request.headers.get("authorization", "")
@@ -201,6 +201,13 @@ def create_app(settings: Settings | None = None, boxes: MarkdownBoxStore | None 
         if 32 <= len(raw) <= 128 and await asyncio.to_thread(identity_for, raw):
             return "cubby", raw
         return None
+
+    def same_site(origin: str) -> bool:
+        """The page's own origin (PUBLIC_URL), and with LOCAL_HTTP=1 also the loopback addresses, so a
+        tunnel can front the server while it is still used on the laptop itself."""
+        if origin.startswith(settings.url):
+            return True
+        return bool(settings.local_http and re.match(r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?(/|$)", origin))
 
     def denied():
         return JSONResponse({"error": "Sign in with your UCSC account through Campus Cubbies, open the judge link, or send your Campus Cubbies bearer.",
