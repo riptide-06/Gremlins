@@ -1,0 +1,422 @@
+"""Boxes: the Markdown documents gremlins reason from. See docs/boxes/README.md.
+
+A box is parsed fresh on every load. Nothing here calls a model. The only
+writes are appends to numbered sections (student sections 4 to 8, department
+session log), and every appended line is timestamped.
+
+BoxStore is the interface. MarkdownBoxStore reads files under a directory.
+GoogleDocBoxStore is a stub for the Docs API (scope documents.readonly).
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+import os
+from pathlib import Path
+import re
+from typing import Protocol
+
+BASE = Path(__file__).resolve().parent
+DEFAULT_ROOT = BASE / "docs" / "boxes"
+PERMISSION_VALUES = {"yes", "no", "ask", "never"}
+
+_SECTION = re.compile(r"^##\s+(\d+)\.\s*(.+?)\s*$")
+_KV = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
+_ID_LINE = re.compile(r"^([FPQE])-(\d+[A-Za-z0-9]*)\s*\|\s*(.*)$")
+_TABLE_SEP = re.compile(r"^\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+_CLAUSE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(==|!=|<=|>=|<|>|~)\s*(.*?)\s*$")
+
+
+@dataclass(frozen=True)
+class Fact:
+    id: str
+    text: str
+    authority: str
+    source: str
+    verified: bool
+
+
+@dataclass(frozen=True)
+class Precedence:
+    id: str
+    text: str
+    wins: str = ""
+    loses: str = ""
+
+
+@dataclass(frozen=True)
+class FAQ:
+    id: str
+    question: str
+    answer: str
+
+
+@dataclass(frozen=True)
+class Escalation:
+    id: str
+    text: str
+    when: str
+
+
+@dataclass
+class Section:
+    number: int
+    title: str
+    lines: list[str] = field(default_factory=list)
+
+
+@dataclass
+class Box:
+    name: str
+    meta: dict[str, str] = field(default_factory=dict)
+    sections: list[Section] = field(default_factory=list)
+    fields: dict[str, str] = field(default_factory=dict)
+    facts: dict[str, Fact] = field(default_factory=dict)
+    precedence: dict[str, Precedence] = field(default_factory=dict)
+    faq: dict[str, FAQ] = field(default_factory=dict)
+    escalations: dict[str, Escalation] = field(default_factory=dict)
+    permissions: dict[str, dict[str, str]] = field(default_factory=dict)
+    preferences: list[str] = field(default_factory=list)
+    text: str = ""
+
+    # ---- derived views -------------------------------------------------
+    @property
+    def authority_order(self) -> list[str]:
+        raw = self.meta.get("authority_order") or self.fields.get("authority_order") or ""
+        return [p.strip().lower() for p in raw.split(">") if p.strip()]
+
+    def authority_rank(self, level: str) -> int:
+        """0 is highest. Unknown levels rank below every known one."""
+        order = self.authority_order
+        level = (level or "").strip().lower()
+        return order.index(level) if level in order else len(order)
+
+    def highest_authority(self, cite_ids) -> str:
+        levels = [self.facts[c].authority for c in cite_ids if c in self.facts]
+        if not levels:
+            return ""
+        return min(levels, key=self.authority_rank)
+
+    @property
+    def ids(self) -> set[str]:
+        return set(self.facts) | set(self.precedence) | set(self.faq) | set(self.escalations)
+
+    def has(self, cite: str) -> bool:
+        return cite in self.ids
+
+    def section(self, number: int) -> Section | None:
+        return next((s for s in self.sections if s.number == number), None)
+
+    def permission(self, field_name: str, dept: str) -> str:
+        """Permission for one field toward one department. Unknown is `never`."""
+        row = self.permissions.get(field_name)
+        if not row:
+            return "never"
+        for key, value in row.items():
+            if key.lower() == dept.lower():
+                return value
+        return "never"
+
+    @property
+    def departments(self) -> list[str]:
+        seen: list[str] = []
+        for row in self.permissions.values():
+            for dept in row:
+                if dept not in seen:
+                    seen.append(dept)
+        return seen
+
+    def matching_escalations(self, context: dict, question: str = "") -> list[Escalation]:
+        scope = {**context, "question": question}
+        return [e for e in self.escalations.values() if match_condition(e.when, scope)]
+
+    def knowledge_text(self) -> str:
+        """The department knowledge a prompt may contain: facts, precedence, FAQ, triggers."""
+        out: list[str] = []
+        if self.facts:
+            out.append("FACTS (id | fact | authority | source | verified)")
+            out += [f"{f.id} | {f.text} | {f.authority} | {f.source} | {'yes' if f.verified else 'no'}"
+                    for f in self.facts.values()]
+        if self.precedence:
+            out.append("\nPRECEDENCE (id | rule | wins | loses)")
+            out += [f"{p.id} | {p.text} | {p.wins} | {p.loses}" for p in self.precedence.values()]
+        if self.faq:
+            out.append("\nFAQ (id | question | answer)")
+            out += [f"{q.id} | {q.question} | {q.answer}" for q in self.faq.values()]
+        if self.escalations:
+            out.append("\nESCALATION TRIGGERS (id | trigger | when)")
+            out += [f"{e.id} | {e.text} | {e.when}" for e in self.escalations.values()]
+        return "\n".join(out)
+
+
+# ---- parsing -----------------------------------------------------------
+def _split(line: str) -> list[str]:
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def _yes(value: str) -> bool:
+    return value.strip().lower() in {"yes", "true", "y", "1"}
+
+
+def parse_box(text: str, name: str = "box") -> Box:
+    box = Box(name=name, text=text)
+    current: Section | None = None
+    table_header: list[str] | None = None
+    in_table = False
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        heading = _SECTION.match(line)
+        if heading:
+            current = Section(int(heading.group(1)), heading.group(2))
+            box.sections.append(current)
+            table_header, in_table = None, False
+            continue
+        if line.startswith("#"):
+            table_header, in_table = None, False
+            continue
+        if current is not None:
+            current.lines.append(line)
+        stripped = line.strip()
+        if not stripped:
+            table_header, in_table = None, False
+            continue
+
+        # permissions table
+        if in_table and table_header:
+            if _TABLE_SEP.match(stripped):
+                continue
+            cells = _split(stripped)
+            if "|" in stripped and cells and cells[0]:
+                row = {}
+                for dept, value in zip(table_header[1:], cells[1:]):
+                    value = value.lower()
+                    row[dept] = value if value in PERMISSION_VALUES else "never"
+                box.permissions[cells[0]] = row
+                continue
+            in_table, table_header = False, None
+        if "|" in stripped and _split(stripped)[0].lower() == "field":
+            table_header = _split(stripped)
+            in_table = True
+            continue
+
+        idm = _ID_LINE.match(stripped)
+        if idm:
+            kind, num, rest = idm.groups()
+            ident = f"{kind}-{num}"
+            cols = _split(rest)
+            if kind == "F":
+                cols += [""] * (4 - len(cols))
+                box.facts[ident] = Fact(ident, cols[0], cols[1].lower(), cols[2], _yes(cols[3]))
+            elif kind == "P":
+                cols += [""] * (3 - len(cols))
+                box.precedence[ident] = Precedence(ident, cols[0], cols[1].lower(), cols[2].lower())
+            elif kind == "Q":
+                cols += [""] * (2 - len(cols))
+                box.faq[ident] = FAQ(ident, cols[0], cols[1])
+            elif kind == "E":
+                cols += [""] * (2 - len(cols))
+                box.escalations[ident] = Escalation(ident, cols[0], cols[1])
+            continue
+
+        kv = _KV.match(stripped)
+        if kv and not stripped.startswith("http"):
+            key, value = kv.group(1), kv.group(2).strip()
+            if key == "prefer":
+                box.preferences.append(value)
+            elif current is None:
+                box.meta[key] = value
+            else:
+                box.fields[key] = value
+    return box
+
+
+# ---- conditions --------------------------------------------------------
+def _coerce(value: str):
+    v = value.strip().strip('"').strip("'")
+    try:
+        return float(v) if "." in v else int(v)
+    except ValueError:
+        return v.lower()
+
+
+def _eval_clause(clause: str, scope: dict) -> bool:
+    m = _CLAUSE.match(clause)
+    if not m:
+        return False
+    key, op, rhs = m.groups()
+    if key not in scope or scope[key] is None:
+        return False
+    left_raw = scope[key]
+    if op == "~":
+        try:
+            return re.search(rhs, str(left_raw), re.IGNORECASE) is not None
+        except re.error:
+            return False
+    left = _coerce(str(left_raw))
+    right = _coerce(rhs)
+    if isinstance(left, (int, float)) != isinstance(right, (int, float)):
+        # number vs text: only equality is meaningful, never ordering
+        left, right = str(left).lower(), str(right).lower()
+        if op not in ("==", "!="):
+            return False
+    try:
+        return {"==": left == right, "!=": left != right, "<": left < right,
+                "<=": left <= right, ">": left > right, ">=": left >= right}[op]
+    except TypeError:
+        return False
+
+
+def match_condition(when: str, scope: dict) -> bool:
+    """`a == 1 and b ~ x or c < 3`; `and` binds tighter than `or`. Empty never matches."""
+    if not when or not when.strip():
+        return False
+    return any(all(_eval_clause(c, scope) for c in re.split(r"\s+and\s+", group))
+               for group in re.split(r"\s+or\s+", when.strip()))
+
+
+# ---- stores ------------------------------------------------------------
+def stamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def log_line(kind: str, *cols) -> str:
+    cells = [stamp(), kind, *[str(c).replace("|", "/").replace("\n", " ") for c in cols]]
+    return " | ".join(cells)
+
+
+class BoxStore(Protocol):
+    def exists(self, name: str) -> bool: ...
+    def load(self, name: str) -> Box: ...
+    def append(self, name: str, section: int, line: str) -> None: ...
+    def write(self, name: str, text: str) -> None: ...
+
+
+class MarkdownBoxStore:
+    """Boxes as `<root>/<name>.md`. Falls back to `<name>.example.md` when the
+    real export has not been dropped yet."""
+
+    def __init__(self, root: str | os.PathLike | None = None):
+        self.root = Path(root or os.environ.get("BOX_DIR") or DEFAULT_ROOT)
+
+    def path(self, name: str) -> Path:
+        if "/" in name or "\\" in name or name.startswith("."):
+            raise ValueError("Box names are plain identifiers.")
+        real = self.root / f"{name}.md"
+        if real.exists():
+            return real
+        example = self.root / f"{name}.example.md"
+        return example if example.exists() else real
+
+    def exists(self, name: str) -> bool:
+        return self.path(name).exists()
+
+    def load(self, name: str) -> Box:
+        path = self.path(name)
+        return parse_box(path.read_text(encoding="utf-8"), name)
+
+    def write(self, name: str, text: str) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / f"{name}.md").write_text(text, encoding="utf-8")
+
+    def append(self, name: str, section: int, line: str) -> None:
+        path = self.path(name)
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        start = next((i for i, l in enumerate(lines)
+                      if (m := _SECTION.match(l)) and int(m.group(1)) == section), None)
+        if start is None:
+            raise ValueError(f"Box {name} has no section {section}.")
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+        # keep one blank line after the heading, insert before the next heading
+        block = lines[start + 1:end]
+        while block and not block[-1].strip():
+            block.pop()
+        if not block:
+            block = [""]
+        new = lines[:start + 1] + block + [line.replace("\n", " ").rstrip(), ""] + lines[end:]
+        path.write_text("\n".join(new).rstrip("\n") + "\n", encoding="utf-8")
+
+    def set_field(self, name: str, key: str, value: str) -> None:
+        """Change one `key: value` profile line in place (used by the demo to
+        flip a field and re-ask). Not an agent tool."""
+        path = self.path(name)
+        pattern = re.compile(rf"^{re.escape(key)}:\s*.*$", re.MULTILINE)
+        text, n = pattern.subn(f"{key}: {value}", path.read_text(encoding="utf-8"), count=1)
+        if not n:
+            raise KeyError(key)
+        path.write_text(text, encoding="utf-8")
+
+
+class GoogleDocBoxStore:
+    """TODO: read a box straight from the student's Google Doc.
+
+    Plan: reuse the Google OAuth client registered in cloud_app.create_app,
+    request the additional scope `https://www.googleapis.com/auth/documents.readonly`,
+    call `documents.get(documentId)` and flatten `body.content` paragraphs to
+    Markdown lines before handing them to parse_box. Appends go through
+    `documents.batchUpdate` with an insertText request anchored at the end of
+    the numbered section. Nothing is implemented yet; every method raises.
+    """
+
+    SCOPE = "https://www.googleapis.com/auth/documents.readonly"
+
+    def __init__(self, doc_ids: dict[str, str], credentials=None):
+        self.doc_ids, self.credentials = doc_ids, credentials
+
+    def exists(self, name: str) -> bool:
+        return name in self.doc_ids
+
+    def load(self, name: str) -> Box:
+        raise NotImplementedError("GoogleDocBoxStore.load: wire the Docs API (documents.readonly).")
+
+    def append(self, name: str, section: int, line: str) -> None:
+        raise NotImplementedError("GoogleDocBoxStore.append: needs documents scope, not just readonly.")
+
+    def write(self, name: str, text: str) -> None:
+        raise NotImplementedError("GoogleDocBoxStore.write is not supported; create the Doc by hand.")
+
+
+STUDENT_TEMPLATE = """# Student box
+
+student: {student}
+authority_order: federal > state > campus > department
+synthetic: yes
+
+## 1. Profile
+
+name: {name}
+email: {email}
+
+## 2. Preferences
+
+prefer: fewer units
+prefer: more hours
+prefer: sooner
+
+## 3. Sharing permissions
+
+Field | ISO
+--- | ---
+name | never
+email | never
+
+## 4. Session log
+
+## 5. Converged answers
+
+## 6. Escalated briefs
+
+## 7. Shared fields
+
+## 8. Open items
+"""
+
+
+def seed_student_box(store: BoxStore, name: str, student_id: str, display_name: str, email: str) -> bool:
+    """Create a student box on first login. Returns False if one already exists."""
+    if store.exists(name):
+        return False
+    clean = lambda s: str(s or "").replace("\n", " ").strip()
+    store.write(name, STUDENT_TEMPLATE.format(student=clean(student_id), name=clean(display_name),
+                                              email=clean(email)))
+    return True
