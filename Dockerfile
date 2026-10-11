@@ -3,7 +3,8 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:0.7.4 /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
-COPY cloud_app.py gremlin_client.py gremlin_slim.py SLIM.md ./
+COPY cloud_app.py gremlin_client.py gremlin_slim.py SLIM.md box.py brain.py dept_gremlin.py wall.py advocate.py mcp_server.py ./
+COPY docs/boxes ./docs/boxes
 RUN useradd --uid 10001 --create-home gremlin
 USER gremlin
 ENV PYTHONUNBUFFERED=1

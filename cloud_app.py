@@ -29,6 +29,12 @@ from starlette.applications import Starlette
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from starlette.routing import Route
+from mcp.server.transport_security import TransportSecuritySettings
+
+from advocate import Advocate, in_process, over_a2a
+from box import MarkdownBoxStore, seed_student_box
+from dept_gremlin import DeptGremlin
+from mcp_server import CURRENT_ADVOCATE, build_mcp
 
 logger = logging.getLogger("gremlin")
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -36,6 +42,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 CALLER = ContextVar("gremlin_caller", default=None)
+MCP_CALLER = ContextVar("gremlin_mcp_caller", default=None)
 MAX_ENTRIES = 200
 
 
@@ -56,6 +63,8 @@ class Settings:
     session_secret: str = os.getenv("SESSION_SECRET", "")
     domain: str = os.getenv("ALLOWED_DOMAIN", "ucsc.edu")
     local_http: bool = os.getenv("LOCAL_HTTP") == "1"
+    box_dir: str = os.getenv("BOX_DIR", str(Path(__file__).with_name("docs") / "boxes"))
+    iso_url: str = os.getenv("ISO_URL", "")  # empty: ISO gremlin runs in-process
 
 
 class FirestoreMemory:
@@ -261,14 +270,60 @@ def page(title, body):
 <div class="muted">GREMLIN · IN YOUR CORNER</div><h1>""" + escape(title) + "</h1>" + body + "</html>", headers={"Cache-Control": "no-store", "Referrer-Policy": "same-origin", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
 
 
-def create_app(settings=None, store=None):
+def student_box_name(uid):
+    return "student-" + uid[:32]
+
+
+class McpGuard:
+    """/mcp is reachable only by a signed-in student (session cookie) or a student
+    bearer credential. Advisors have no advocate. The caller's uid is request-local."""
+
+    def __init__(self, app, store, advocate_for):
+        self.app, self.store, self.advocate_for = app, store, advocate_for
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope["path"].startswith("/mcp"):
+            await self.app(scope, receive, send)
+            return
+        uid = (scope.get("session") or {}).get("uid")
+        if not uid:
+            auth = dict(scope["headers"]).get(b"authorization", b"")
+            raw = auth[7:] if auth.startswith(b"Bearer ") else b""
+            if 32 <= len(raw) <= 128:
+                try:
+                    caller = await asyncio.to_thread(self.store.authorize, raw.decode("ascii"))
+                except UnicodeDecodeError:
+                    caller = None
+                if caller and caller["role"] == "student":
+                    uid = caller["uid"]
+        if not uid:
+            emit("mcp_authentication_denied")
+            await JSONResponse({"error": "Sign in with your UCSC account or use a student bearer credential. Advisors cannot use the advocate."},
+                               status_code=401)(scope, receive, send)
+            return
+        marker = CURRENT_ADVOCATE.set(self.advocate_for(uid))
+        try:
+            emit("mcp_request", role="student")
+            await self.app(scope, receive, send)
+        finally:
+            CURRENT_ADVOCATE.reset(marker)
+
+
+def create_app(settings=None, store=None, boxes=None, brain=None):
     settings = settings or Settings()
     store = store or FirestoreMemory(settings.project)
+    boxes = boxes or MarkdownBoxStore(settings.box_dir)
     oauth = OAuth()
     if settings.client_id and settings.client_secret:
         oauth.register(name="google", client_id=settings.client_id, client_secret=settings.client_secret,
                        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-                       client_kwargs={"scope": "openid email", "code_challenge_method": "S256"})
+                       client_kwargs={"scope": "openid email profile", "code_challenge_method": "S256"})
+
+    # One ISO caller for the process; the advocate itself is built per request and holds no state.
+    iso = over_a2a(settings.iso_url) if settings.iso_url else in_process(DeptGremlin("iso", store=boxes, brain=brain))
+
+    def advocate_for(uid):
+        return Advocate(store=boxes, student_box=student_box_name(uid), depts={"iso": iso})
 
     def form(request, action, label):
         csrf = request.session.setdefault("csrf", secrets.token_urlsafe(32))
@@ -291,6 +346,7 @@ def create_app(settings=None, store=None):
             body += '<section><h2>Optional: invite an advisor agent</h2><p class="muted">Share only this block with an outside contributor. It cannot read your notebook.</p><pre>' + escape(advisor) + '</pre></section>'
         body += '<section><h2>Agent credentials</h2><p>Generating new credentials replaces both previous credentials. Revoking them preserves your memory but blocks agent access.</p>'
         body += form(request, "/credentials", "Generate new connection instructions") + form(request, "/revoke", "Revoke agent access") + '</section>'
+        body += '<section><h2>Your advocate over MCP</h2><p>Add a custom connector in Claude at <code>' + escape(settings.url) + '/mcp</code> with header <code>Authorization: Bearer &lt;your student token&gt;</code>. Tools: ask, my_box, approve_share, open_items.</p></section>'
         body += '<section><h2>Optional: A2A over SLIM</h2><p>Use a local SLIM gateway with the same role credentials. No public SLIM relay is hosted here.</p><a href="/SLIM.md">Laptop setup instructions</a> · <a href="/gremlin_slim.py">Download SLIM gateway and client</a></section>'
         body += '<p class="muted">Hackathon pilot: use synthetic information, not health, immigration, or other sensitive records. Memory is stored in this project’s Firestore database, accessible to its administrators. This is not an approved campus advising service.</p>'
         body += form(request, "/logout", "Sign out")
@@ -327,6 +383,14 @@ def create_app(settings=None, store=None):
         request.session.clear()
         request.session.update({"uid": uid, "csrf": secrets.token_urlsafe(32)})
         emit("google_login_succeeded")
+        # First login: a student box seeded with name and UCSC email from the Google profile.
+        try:
+            created = await asyncio.to_thread(seed_student_box, boxes, student_box_name(uid), uid[:12],
+                                              claims.get("name") or claims["email"].split("@")[0], claims["email"])
+            if created:
+                emit("student_box_created")
+        except Exception:
+            emit("student_box_seed_failed")
         return RedirectResponse("/", status_code=303)
 
     async def credentials(request):
@@ -376,17 +440,29 @@ def create_app(settings=None, store=None):
         supported_interfaces=[AgentInterface(url=settings.url + "/a2a", protocol_binding="JSONRPC", protocol_version="1.0")],
         skills=[AgentSkill(id="memory", name="Permissioned memory tools", description="Say hello to learn your role and tool calls.", tags=["memory", "student-controlled"])])
     handler = DefaultRequestHandler(agent_executor=Executor(store, settings), task_store=InMemoryTaskStore(), agent_card=card)
+    # Stateless streamable HTTP so Cloud Run restarts and multiple instances are fine.
+    # Auth is McpGuard (session or student bearer), so DNS-rebinding host checks are off.
+    mcp = build_mcp(CURRENT_ADVOCATE.get, stateless_http=True, json_response=True, streamable_http_path="/mcp",
+                    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+    mcp_routes = mcp.streamable_http_app().routes  # the /mcp route; its session manager runs in our lifespan
     app = Starlette(routes=[Route("/", home), Route("/login", login), Route("/auth/callback", callback),
                             Route("/credentials", credentials, methods=["POST"]), Route("/revoke", revoke, methods=["POST"]),
                              Route("/logout", logout, methods=["POST"]), Route("/gremlin_client.py", download), Route("/health", health), Route("/healthz", health),
                              Route("/gremlin_slim.py", slim_download), Route("/SLIM.md", slim_instructions),
-                            *create_agent_card_routes(card), *create_jsonrpc_routes(handler, "/a2a")])
+                            *create_agent_card_routes(card), *create_jsonrpc_routes(handler, "/a2a"),
+                            *mcp_routes],
+                    lifespan=lambda _app: mcp.session_manager.run())
+    # Middleware order (inner to outer): McpGuard sees the session that SessionMiddleware
+    # loads; ProtocolGuard stays outermost for /a2a exactly as before.
+    app.add_middleware(McpGuard, store=store, advocate_for=advocate_for)
     # An unconfigured service can expose health/discovery, but cannot log in.
     # The random fallback is not a usable production session configuration.
     app.add_middleware(SessionMiddleware, secret_key=settings.session_secret or secrets.token_urlsafe(48),
                        https_only=not settings.local_http, same_site="lax", max_age=3600)
     app.add_middleware(ProtocolGuard, store=store)
     app.state.oauth = oauth
+    app.state.mcp = mcp
+    app.state.boxes = boxes
     return app
 
 
