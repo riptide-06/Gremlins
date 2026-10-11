@@ -83,6 +83,16 @@ def check_ports() -> None:
     line(OK if os.environ.get("DEMO_TOKEN") else WARN, "DEMO_TOKEN", "set" if os.environ.get("DEMO_TOKEN") else "unset (judge link needs it)")
 
 
+def check_site() -> None:
+    line(OK if (HERE / "site.html").exists() else BAD, "site.html", "present" if (HERE / "site.html").exists() else "missing: the app serves it at /")
+    try:
+        import httpx
+        r = httpx.get((os.environ.get("CUBBY_URL") or "https://cubby.bayleaf.dev").rstrip("/") + "/.well-known/agent-card.json", timeout=6)
+        line(OK if r.status_code == 200 else WARN, "Campus Cubbies", f"agent card {r.status_code}")
+    except Exception as exc:
+        line(WARN, "Campus Cubbies", f"not reachable from here ({type(exc).__name__}); students can't pair until it is")
+
+
 def check_git() -> None:
     try:
         branch = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, cwd=HERE).stdout.strip()
@@ -113,6 +123,7 @@ if __name__ == "__main__":
     check_keys()
     check_boxes()
     check_cache()
+    check_site()
     check_ports()
     check_git()
     if args.live:

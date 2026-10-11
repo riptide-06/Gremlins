@@ -99,6 +99,7 @@ class CubbyBoxStore:
         self.fallback = fallback or MarkdownBoxStore()
         self.cubby_names = cubby_names or {"student"}
         self.root = getattr(self.fallback, "root", None)   # seed_student_box reads the template from here
+        self._ids: dict[str, str] = {}                      # box name -> Drive file id, learned from the first listing
 
     def _is_cubby(self, name: str) -> bool:
         return name in self.cubby_names or name.startswith("student")
@@ -111,10 +112,19 @@ class CubbyBoxStore:
         wanted = self.filename(name)
         for f in self.client.list_files():
             if f.get("name") == wanted and not f.get("trashed"):
+                self._ids[name] = f["id"]
                 return f
+        self._ids.pop(name, None)
         return None
 
     def _read(self, name: str) -> dict:
+        """One call when the file id is already known; a listing first when it is not (or it moved)."""
+        fid = self._ids.get(name)
+        if fid:
+            try:
+                return self.client.read_file(fid)
+            except CubbyError:
+                self._ids.pop(name, None)
         f = self._find(name)
         if not f:
             raise FileNotFoundError(f"{self.filename(name)} is not in the cubby yet; run `cubby_store.py seed`")

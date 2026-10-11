@@ -510,16 +510,18 @@ SendMessage {"session_id","question","context"}</pre>
   function startConnect(){
     connectError('');
     $('connect-start').disabled = true;
+    // open the tab synchronously inside the click so popup blockers allow it; point it at Campus Cubbies once we have the code
+    var tab = null; try { tab = window.open('', '_blank'); } catch (e) { tab = null; }
     api('/api/connect/start', {}).then(function(d){
       $('connect-start').disabled = false;
-      if (d.error) { connectError(d.error); return; }
+      if (d.error) { if (tab) tab.close(); connectError(d.error); return; }
       $('user-code').textContent = d.user_code;
       $('approval-link').href = d.verification_uri_complete;
       showWait(true);
       state.interval = d.interval || 5;
-      window.open(d.verification_uri_complete, '_blank', 'noopener');
+      if (tab) { try { tab.location = d.verification_uri_complete; } catch (e) {} } else { $('poll-status').textContent = 'Your browser blocked the tab: use the button to open Campus Cubbies.'; }
       schedulePoll(state.interval);
-    }).catch(function(){ $('connect-start').disabled = false; connectError('Could not reach this server.'); });
+    }).catch(function(){ if (tab) tab.close(); $('connect-start').disabled = false; connectError('Could not reach this server.'); });
   }
   function schedulePoll(seconds){ stopPolling(); state.pollTimer = setTimeout(pollOnce, seconds * 1000); }
   function pollOnce(){

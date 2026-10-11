@@ -24,46 +24,37 @@ October 10 to 11, 2026. Level 3.
 
 ## Try it
 
-**Judge, no account:** open the judge link the team gives you (`/demo?token=...` on
-the Cloud Run service). You are signed in as a synthetic student (Asha Rao, F-1,
-17 units, 10 on-campus hours, CS: Computer Game Design, Crown). Type any of the
-questions in [docs/QUESTIONS.md](docs/QUESTIONS.md), or your own. Change a field in
-the cubby panel (`days_to_deadline` to `2`) and ask the same question again.
+**Student (the real thing):** open the site, press *Continue with UCSC Google*. That is
+Campus Cubbies' own approval page: you sign in with your UCSC account, consent once, and
+your My Cubby folder exists in your Drive. From then on your gremlin keeps one file there,
+`gremlin-student.md`, and every verdict it writes lands in your own Drive. Chat on the site,
+fill in your profile and sharing rules on *My Cubby*, or point your own Claude at `/mcp`
+with the token Campus Cubbies gave your agent.
 
-**Student, your own agent:** sign in with your UCSC Google account at the service,
-generate a student bearer token, and add `https://<service>/mcp` as an MCP
-connector in Claude (or any MCP client) with `Authorization: Bearer <token>`.
-Tools: `ask`, `my_box`, `approve_share`, `open_items`. Your box is seeded from
-[docs/boxes/student.template.md](docs/boxes/student.template.md) on first login.
+**Judge, no account:** the team gives you a link (`/demo?token=...`). You are the synthetic
+student Asha Rao (F-1, 17 units, 10 on-campus hours, CS: Computer Game Design, Crown). Try
+the question cards, approve a field when asked, change `days_to_deadline` to 2 on *My Cubby*
+and ask the first question again. *Reset the demo student* puts everything back.
 
-**Student, box in your real cubby:** pair your agent with Campus Cubbies (the
-pairing page at https://cubby.bayleaf.dev gives you a private token), then
-
-```sh
-export CUBBY_URL=https://cubby.bayleaf.dev CUBBY_TOKEN=...   # never into a file or a chat
-uv run cubby_store.py check                                # hello, your folder link, files
-uv run cubby_store.py seed                                 # creates gremlin-student.md from the template
-uv run demo.py --store cubby --questions c1                # the advocate reads and appends to that file
-BOX_STORE=cubby uv run mcp_server.py                       # same, from your own Claude over MCP
-```
-
-Open the folder link: the verdict lines appear in `gremlin-student.md` in your Drive.
-Department boxes never go there; they are policy and stay on the server.
+**Your own agent (MCP):** pair any agent with Campus Cubbies ([its guide](prototypes/cubbies/SKILL.md)),
+then add `https://<service>/mcp` with `Authorization: Bearer <that token>`. Tools: `ask`,
+`my_box`, `approve_share`, `open_items`. Same cubby, same wall.
 
 **Laptop, everything local:**
 
 ```sh
-uv sync && uv run pytest -q                       # 154 tests, no network
+uv sync && uv run pytest -q                       # 142 tests, no network
 uv run preflight.py --live                        # keys, boxes, cache, ports, git, one call per model
-uv run demo.py                                    # the six judge questions, four gremlins, fresh copy of the boxes
-uv run eval.py                                    # ten cases: gremlins vs one-call baseline
-uv run mcp_server.py                              # the advocate over MCP (stdio) for Claude Desktop / Claude Code
-uv run dept_gremlin.py serve --dept cmpm --port 10002   # a department gremlin as its own A2A server
 DEMO_TOKEN=judge LOCAL_HTTP=1 uv run uvicorn gremlin_app:app --port 8080 --no-access-log   # then open /demo?token=judge
+uv run demo.py                                    # the six judge questions in the terminal, fresh copy of the boxes
+uv run eval.py                                    # ten cases: gremlins vs one-call baseline
+uv run mcp_server.py                              # the advocate over MCP (stdio); BOX_STORE=cubby for your real cubby
+uv run dept_gremlin.py serve --dept cmpm --port 10002   # a department gremlin as its own A2A server
 ```
 
 Model keys go in `.env` (`GROQ_API_KEY`, `NVIDIA_NIM_API_KEY`, `GEMINI_API_KEY`; any
 one is enough, free tiers). Without a key the demo runs the scripted brain and tells you.
+`CUBBY_URL` defaults to https://cubby.bayleaf.dev.
 
 ## How it works
 
@@ -132,8 +123,8 @@ one is enough, free tiers). Without a key the demo runs the scripted brain and t
 
 Built October 10 to 11: `box.py`, `brain.py`, `dept_gremlin.py`, `wall.py`, `advocate.py`,
 `mcp_server.py`, `cubby_store.py`, `baseline.py`, `eval.py`, `demo.py`, `chat.html`, the judge mode and
-`/api` routes in `gremlin_app.py` (the advocate service, grown from the Firestore
-prototype's login), the four department boxes, the student template and
+`/api` routes in `gremlin_app.py` (the advocate service: Campus Cubbies pairing as sign-in,
+the site, judge mode, MCP), `site.html`, the four department boxes, the student template and
 demo student, `docs/CUBBY.md`, `docs/QUESTIONS.md`, and the tests.
 
 Pre-existing (Adam Smith's Campus Cubbies / BayLeaf work and the earlier memory
@@ -155,8 +146,11 @@ questions went 6/10 then 9/10 as two real bugs were fixed, both described in
   sourced line before any real use.
 - Conflict detection compares each department's best option by `units`; a disagreement
   that is not about units is reported as agreement unless an `E-xx` trigger catches it.
-- On Cloud Run the boxes live on the container's filesystem, so writes do not survive a
-  new instance; the Drive store is the fix, not a bigger disk.
+- A signed-in student's box lives in their Drive through Campus Cubbies, so it survives
+  anything; the judge's synthetic box lives on the container's filesystem and resets with it.
+- The session cookie carries the student's Campus Cubbies bearer (signed, httponly, 48 hours,
+  the same lifetime Campus Cubbies gives the token). Log out clears it; Campus Cubbies'
+  `revoke_agents` kills it from the other side.
 - Free-tier models rate-limit under four parallel calls; the model order and the replay
   cache are the mitigation, not a solution.
 

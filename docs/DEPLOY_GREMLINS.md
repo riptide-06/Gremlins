@@ -11,14 +11,14 @@ IMAGE=$REGION-docker.pkg.dev/$PROJECT/gremlins/$SERVICE
 gcloud builds submit --config cloudbuild.gremlins.yaml --ignore-file Dockerfile.gremlins.dockerignore --substitutions _IMAGE=$IMAGE
 gcloud run deploy $SERVICE --image $IMAGE --region $REGION \
   --allow-unauthenticated --max-instances 1 \
-  --set-env-vars PUBLIC_URL=https://$SERVICE-331254975906.$REGION.run.app,DEMO_TOKEN=<pick a long random string> \
+  --set-env-vars PUBLIC_URL=https://$SERVICE-331254975906.$REGION.run.app,DEMO_TOKEN=<pick a long random string>,CUBBY_URL=https://cubby.bayleaf.dev \
   --set-secrets GROQ_API_KEY=groq-key:latest,NVIDIA_NIM_API_KEY=nim-key:latest,GEMINI_API_KEY=gemini-key:latest,SESSION_SECRET=session-secret:latest
 ```
 
 Create the secrets once (`gcloud secrets create groq-key --data-file=-` and paste the key;
-never put a key in a file that is committed). Google login (`GOOGLE_CLIENT_ID`,
-`GOOGLE_CLIENT_SECRET`) is optional for judging; without it only `/demo?token=` and
-`/health` work, which is all a judge needs.
+never put a key in a file that is committed). There is no Google login to configure here:
+students sign in through Campus Cubbies' pairing page, and `PUBLIC_URL` must be the real
+service URL so the site's same-origin checks pass.
 
 Judge link: `https://<service url>/demo?token=<DEMO_TOKEN>`. Boxes live on the container's
 filesystem (writes do not survive a new instance; `--max-instances 1` keeps one). The
