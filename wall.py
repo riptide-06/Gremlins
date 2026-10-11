@@ -117,9 +117,15 @@ def outbound(student: Box, dept: str, question: str, approvals: set[str] | None 
     return out
 
 
+def shared_line(out: Outbound, session_id: str) -> str | None:
+    """The section-7 line that records what left the box for one department, or None if nothing did."""
+    return log_line("SHARED", out.dept, ",".join(out.shared), session_id) if out.shared else None
+
+
 def log_shared(store: BoxStore, name: str, out: Outbound, session_id: str) -> None:
-    if out.shared:
-        store.append(name, SHARED_SECTION, log_line("SHARED", out.dept, ",".join(out.shared), session_id))
+    line = shared_line(out, session_id)
+    if line:
+        store.append(name, SHARED_SECTION, line)
 
 
 def approve(store: BoxStore, name: str, field_name: str, dept: str) -> bool:

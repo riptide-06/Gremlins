@@ -26,7 +26,7 @@ import uuid
 
 from box import Box, BoxStore, MarkdownBoxStore, log_line
 from dept_gremlin import DeptGremlin, ask_dept, empty_answer
-from wall import Inbound, Outbound, approved_fields, inbound, log_shared, outbound
+from wall import SHARED_SECTION, Inbound, Outbound, approved_fields, inbound, outbound, shared_line
 
 SECTION_LOG, SECTION_CONVERGED, SECTION_BRIEFS, SECTION_OPEN = 4, 5, 6, 8
 VERDICTS = ("CONVERGED", "ESCALATED", "DISPUTED", "ASK_STUDENT", "UNANSWERED")
@@ -56,6 +56,7 @@ class DeptResult:
     inbound: Inbound | None = None
     ask: list[str] = field(default_factory=list)       # fields the student must approve or supply
     blocked: list[str] = field(default_factory=list)   # needs the permissions forbid (no/never)
+    pending: list[tuple[int, str]] = field(default_factory=list)   # SHARED lines, written with the verdict in one edit
 
     @property
     def shared(self) -> list[str]:
@@ -127,6 +128,18 @@ def score_options(options: list[dict], preferences: list[str]) -> list[dict]:
     return [{**o, "rank": i + 1} for i, o in enumerate(ranked)]
 
 
+def append_many(store: BoxStore, name: str, items: list[tuple[int, str]]) -> None:
+    """One edit when the store can batch (the cubby), one append per line otherwise."""
+    if not items:
+        return
+    batch = getattr(store, "append_many", None)
+    if batch is not None:
+        batch(name, list(items))
+    else:
+        for section, line in items:
+            store.append(name, section, line)
+
+
 # ---- relevance for round 1 -----------------------------------------------
 def relevant_fields(dept_box: Box, student: Box) -> list[str]:
     """Share first only the yes-fields the department box itself talks about."""
@@ -180,7 +193,8 @@ class Advocate:
         for round_no in (1, 2):
             out = outbound(student, dept, question, approvals, fields=fields, declined=declined)
             result.rounds.append(out)
-            log_shared(self.store, self.student_box, out, session_id)
+            if (line := shared_line(out, session_id)):
+                result.pending.append((SHARED_SECTION, line))
             raw = await self.depts[dept](session_id, out.question, out.context)
             result.inbound = inbound(raw, dept_box, student, dept)
             result.answer = result.inbound.answer
@@ -328,26 +342,27 @@ class Advocate:
 
     # -- writing back ----------------------------------------------------------------
     def write(self, v: Verdict) -> None:
+        """Everything a question leaves in the student box (what was shared per department, the
+        verdict line, the session line) goes in one edit: one round trip to the cubby instead of
+        one per department, and no chance of racing our own previous write."""
         q = v.question[:160]
         best = v.best["option"][:160] if v.best else "-"
         if v.kind == "CONVERGED":
-            self._append(v, SECTION_CONVERGED, log_line("CONVERGED", v.session_id, q, best, ",".join(v.cites) or "-", v.authority or "-"))
+            v.written.append((SECTION_CONVERGED, log_line("CONVERGED", v.session_id, q, best, ",".join(v.cites) or "-", v.authority or "-")))
         elif v.kind in ("ESCALATED", "DISPUTED"):
             b = v.brief
-            self._append(v, SECTION_BRIEFS, log_line(
+            v.written.append((SECTION_BRIEFS, log_line(
                 v.kind, v.session_id, q, "triggers=" + (",".join(v.escalations) or "-"),
                 "agreed=" + ("; ".join(b.get("agreed", [])) or "-"), "disputed=" + ("; ".join(b.get("disputed", [])) or "-"),
                 "options=" + ("; ".join(b.get("options", [])) or "-"), "resolve=" + ("; ".join(b.get("resolve", [])) or "-"),
-                "decides=" + (",".join(b.get("decides", [])) or "-")))
+                "decides=" + (",".join(b.get("decides", [])) or "-"))))
         elif v.kind == "ASK_STUDENT":
             depts = ",".join(sorted({r.dept for r in v.depts if r.ask}))
-            self._append(v, SECTION_OPEN, log_line("ASK_STUDENT", v.session_id, q, ",".join(v.ask), depts))
-        self._append(v, SECTION_LOG, log_line("SESSION", v.session_id, v.kind, ",".join(r.dept for r in v.depts) or "-",
-                                              ",".join(v.cites) or "-", f"dropped={v.dropped}"))
-
-    def _append(self, v: Verdict, section: int, line: str) -> None:
-        self.store.append(self.student_box, section, line)
-        v.written.append((section, line))
+            v.written.append((SECTION_OPEN, log_line("ASK_STUDENT", v.session_id, q, ",".join(v.ask), depts)))
+        v.written.append((SECTION_LOG, log_line("SESSION", v.session_id, v.kind, ",".join(r.dept for r in v.depts) or "-",
+                                                ",".join(v.cites) or "-", f"dropped={v.dropped}")))
+        shared = [item for r in v.depts for item in r.pending]
+        append_many(self.store, self.student_box, shared + v.written)
 
     # -- student-facing reads -----------------------------------------------------------
     def open_items(self) -> list[dict]:

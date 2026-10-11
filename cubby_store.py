@@ -13,6 +13,10 @@ parts concatenated and JSON-decoded into {ok, ...} or {ok: false, error}.
 
 Only the student's box travels this way. Every write is an exact-match edit against
 the revision just read, so a concurrent change fails loudly instead of clobbering.
+Google Drive bumps a file's version a moment after a write of its own, so Campus Cubbies
+can answer "File changed" to a read or an edit that follows one closely; those are retried
+from a fresh read, and the advocate writes one batched edit per question rather than one
+per department.
 """
 from __future__ import annotations
 
@@ -21,6 +25,8 @@ import json
 import os
 import re
 import sys
+import threading
+import time
 import uuid
 
 import httpx
@@ -98,12 +104,31 @@ class CubbyClient:
 class CubbyBoxStore:
     """BoxStore whose student box lives in the cubby. Department boxes come from `fallback`."""
 
+    RETRIES = (0.4, 0.9, 1.8, 3.0)   # seconds between attempts when Drive is still settling a previous write
+
     def __init__(self, client: CubbyClient, fallback: BoxStore | None = None, cubby_names: set[str] | None = None):
         self.client = client
         self.fallback = fallback or MarkdownBoxStore()
         self.cubby_names = cubby_names or {"student"}
         self.root = getattr(self.fallback, "root", None)   # seed_student_box reads the template from here
         self._ids: dict[str, str] = {}                      # box name -> Drive file id, learned from the first listing
+        self._lock = threading.RLock()                      # one cubby conversation at a time per store
+
+    @staticmethod
+    def _transient(exc: Exception) -> bool:
+        return isinstance(exc, CubbyError) and not isinstance(exc, CubbyAuthError) and "File changed" in str(exc)
+
+    def _retry(self, fn):
+        """Run `fn` (a fresh read plus one edit) again when Campus Cubbies reports that the file
+        changed underneath it; Drive does that briefly after any write, including our own."""
+        with self._lock:
+            for i, pause in enumerate(self.RETRIES + (None,)):
+                try:
+                    return fn()
+                except CubbyError as exc:
+                    if pause is None or not self._transient(exc):
+                        raise
+                    time.sleep(pause)
 
     def _is_cubby(self, name: str) -> bool:
         return name in self.cubby_names or name.startswith("student")
@@ -143,41 +168,62 @@ class CubbyBoxStore:
     def load(self, name: str) -> Box:
         if not self._is_cubby(name):
             return self.fallback.load(name)
-        return parse_box(self._read(name)["text"], name)
+        return parse_box(self._retry(lambda: self._read(name))["text"], name)
 
     def write(self, name: str, text: str) -> None:
         if not self._is_cubby(name):
             return self.fallback.write(name, text)
-        current = self._find(name)
-        if current is None:
-            self.client.create_file(self.filename(name), text)
-        else:
-            doc = self.client.read_file(current["id"])
-            self.client.edit_file(doc["file_id"], doc["revision"], doc["text"], text)
+
+        def go():
+            current = self._find(name)
+            if current is None:
+                self.client.create_file(self.filename(name), text)
+            else:
+                doc = self.client.read_file(current["id"])
+                self.client.edit_file(doc["file_id"], doc["revision"], doc["text"], text)
+        self._retry(go)
 
     def append(self, name: str, section: int, line: str) -> None:
+        self.append_many(name, [(section, line)])
+
+    def append_many(self, name: str, items: list[tuple[int, str]]) -> None:
+        """Append several lines, each to its own section, in ONE read and ONE edit: the edit spans
+        from the first affected heading to the end of the last affected section."""
+        if not items:
+            return
         if not self._is_cubby(name):
-            return self.fallback.append(name, section, line)
-        doc = self._read(name)
-        search, replacement = section_edit(doc["text"], section, line)
-        self.client.edit_file(doc["file_id"], doc["revision"], search, replacement)
+            for section, line in items:
+                self.fallback.append(name, section, line)
+            return
+
+        def go():
+            doc = self._read(name)
+            search, replacement = section_edits(doc["text"], items)
+            self.client.edit_file(doc["file_id"], doc["revision"], search, replacement)
+        self._retry(go)
 
     def set_field(self, name: str, key: str, value: str) -> None:
         if not self._is_cubby(name):
             return self.fallback.set_field(name, key, value)  # type: ignore[attr-defined]
-        doc = self._read(name)
-        m = re.search(rf"^{re.escape(key)}:[ \t]*.*$", doc["text"], re.MULTILINE)
-        if not m:
-            raise KeyError(key)
-        # whole line, newline to newline, so prose such as "(units: 15)" can never be the match
-        self.client.edit_file(doc["file_id"], doc["revision"], "\n" + m.group(0) + "\n", f"\n{key}: {value}\n")
+
+        def go():
+            doc = self._read(name)
+            m = re.search(rf"^{re.escape(key)}:[ \t]*.*$", doc["text"], re.MULTILINE)
+            if not m:
+                raise KeyError(key)
+            # whole line, newline to newline, so prose such as "(units: 15)" can never be the match
+            self.client.edit_file(doc["file_id"], doc["revision"], "\n" + m.group(0) + "\n", f"\n{key}: {value}\n")
+        self._retry(go)
 
     def set_permission(self, name: str, field_name: str, dept: str, value: str) -> None:
         if not self._is_cubby(name):
             return self.fallback.set_permission(name, field_name, dept, value)  # type: ignore[attr-defined]
-        doc = self._read(name)
-        old, new = permission_row_edit(doc["text"], field_name, dept, value)
-        self.client.edit_file(doc["file_id"], doc["revision"], "\n" + old + "\n", "\n" + new + "\n")
+
+        def go():
+            doc = self._read(name)
+            old, new = permission_row_edit(doc["text"], field_name, dept, value)
+            self.client.edit_file(doc["file_id"], doc["revision"], "\n" + old + "\n", "\n" + new + "\n")
+        self._retry(go)
 
     def path(self, name: str):
         """Mirrors MarkdownBoxStore.path for callers that print where a box lives."""
@@ -206,6 +252,47 @@ def section_edit(text: str, section: int, line: str) -> tuple[str, str]:
         replacement = "\n".join([block[0], *body, new_line, ""]) + "\n"
     else:                                     # last section: the file's own trailing newline stays
         replacement = "\n".join([block[0], *body, new_line])
+    return search, replacement
+
+
+def section_edits(text: str, items: list[tuple[int, str]]) -> tuple[str, str]:
+    """One exact-match edit that appends every (section, line) in `items`: the search is the
+    text from the first affected heading to the end of the last affected section, the
+    replacement is the same span with the new lines added at the end of their sections.
+    Applying it gives the same file as applying `section_edit` once per item, in one round trip."""
+    lines = text.splitlines()
+    starts = {int(m.group(1)): i for i, l in enumerate(lines) if (m := _SECTION.match(l))}
+    for section, _ in items:
+        if section not in starts:
+            raise ValueError(f"box has no section {section}")
+    wanted = sorted({section for section, _ in items}, key=lambda n: starts[n])
+    first = starts[wanted[0]]
+    last_end = next((i for i in range(starts[wanted[-1]] + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    span = lines[first:last_end]
+    out: list[str] = []
+    i = 0
+    while i < len(span):
+        m = _SECTION.match(span[i])
+        number = int(m.group(1)) if m else None
+        j = i + 1
+        while j < len(span) and not span[j].startswith("## "):
+            j += 1
+        body = list(span[i + 1:j])
+        additions = [l.replace("\n", " ").rstrip() for sec, l in items if sec == number]
+        if additions:
+            while body and not body[-1].strip():
+                body.pop()
+            if not body:
+                body = [""]
+            body += additions
+            if j < len(span) or last_end < len(lines):   # another heading follows: keep one blank line before it
+                body.append("")
+        out += [span[i], *body]
+        i = j
+    search, replacement = "\n".join(span), "\n".join(out)
+    if last_end < len(lines):                 # the newline before the next heading is part of the match
+        search += "\n"
+        replacement += "\n"
     return search, replacement
 
 

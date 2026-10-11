@@ -107,17 +107,39 @@ def test_set_field_and_concurrent_change(cubby):
     assert store.load("student").fields["units"] == "15"
     with pytest.raises(KeyError):
         store.set_field("student", "no_such_field", "1")
-    # someone edits the file in Drive between our read and our write: the edit is refused, nothing clobbered
+    # someone edits the file in Drive between our read and our write: the edit is refused, nothing
+    # clobbered. Drive does this by itself for a moment after any write, so the store re-reads and
+    # retries a few times; a change that keeps happening is still an error.
     fid = next(iter(fake.files))
     original_read = store.client.read_file
+    races = {"left": 2}
     def racing_read(file_id):
         doc = original_read(file_id)
-        fake.files[fid]["version"] += 1
+        if races["left"] > 0:
+            races["left"] -= 1
+            fake.files[fid]["version"] += 1
         return doc
     store.client.read_file = racing_read
+    store.RETRIES = (0.0, 0.0, 0.0)
+    store.append("student", 4, "x | y")                 # two transient conflicts, then it lands
+    assert "x | y" in fake.files[fid]["text"] and races["left"] == 0
+    races["left"] = 99
     with pytest.raises(CubbyError):
-        store.append("student", 4, "x | y")
-    assert "x | y" not in fake.files[fid]["text"]
+        store.append("student", 4, "never | lands")
+    assert "never | lands" not in fake.files[fid]["text"]
+
+
+def test_append_many_is_one_read_and_one_edit(cubby):
+    fake, store = cubby
+    seed_student_box(store, "student", "s-1", "Demo Student", "demo@ucsc.edu")
+    store.load("student")                                # learns the file id once
+    before = len(fake.calls)
+    store.append_many("student", [(7, "t | SHARED | iso | units | s1"), (5, "t | CONVERGED | s1 | q | best | F-01 | federal"),
+                                  (4, "t | SESSION | s1 | CONVERGED | iso | F-01 | dropped=0"), (7, "t | SHARED | cmpm | units | s1")])
+    assert fake.calls[before:] == ["read_file", "edit_file"]
+    box = store.load("student")
+    assert [l for l in box.section(7).lines if "SHARED" in l] == ["t | SHARED | iso | units | s1", "t | SHARED | cmpm | units | s1"]
+    assert any("CONVERGED" in l for l in box.section(5).lines) and any("SESSION" in l for l in box.section(4).lines)
 
 
 def test_bad_credential_is_a_clear_error(cubby):
