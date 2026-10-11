@@ -159,6 +159,10 @@ def test_disputed_at_equal_authority_and_precedence_otherwise(store, tmp_path):
     adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "campus", cites=("F-07",))})
     v = adv.ask_sync("How few units can I take?", "s14")
     assert v.kind == "CONVERGED" and v.brief["precedence"] == ["ISO wins by authority_order (federal) over REGISTRAR (department)"]
+    # the recorded best option comes from the office whose position stands, even though the student
+    # prefers fewer units: the overruled office's menu cannot win what its position lost
+    assert v.best["units"] == 12 and [o["dept"] for o in v.options] == ["iso"]
+    assert "| 12 units |" in [l for l in store.load("student").section(5).lines if "s14" in l][0]
     # quoting a federal rule in passing does not lift a department-level recommendation
     adv = Advocate(store=store, depts={"iso": fake_dept(12, "federal", cites=("F-01",)), "registrar": fake_dept(6, "federal", cites=("F-07",))})
     assert adv.ask_sync("How few units can I take?", "s15").kind == "CONVERGED"

@@ -227,17 +227,21 @@ class Advocate:
         v.escalations = sorted({c for r in results if r.answer.get("escalate")
                                 for c in r.answer.get("cites", []) if c.startswith("E-")})
         v.ask = sorted({f for r in results for f in r.ask})
+        agreed, disputed, decides, precedence, outranked = self._positions(student, answered)
         pooled = [{**o, "dept": r.dept, "authority": r.answer.get("authority", "")}
                   for r in answered for o in r.answer.get("options", [])]
-        v.options = score_options(pooled, student.preferences)
-        v.best = v.options[0] if v.options else None
         v.cites = sorted({c for r in results for c in r.answer.get("cites", [])}
                          | {c for o in pooled for c in o.get("cites", [])})
+        # The menu the student ranks is what the offices whose position stands offered. An office
+        # outranked by precedence keeps its voice in the answer text and the brief, but its options
+        # cannot come out on top of the office that overruled it. A dispute keeps everything.
+        menu = pooled if disputed else [o for o in pooled if o["dept"] not in outranked]
+        v.options = score_options(menu, student.preferences)
+        v.best = v.options[0] if v.options else None
         v.authority = student.highest_authority(v.cites) or next((r.answer.get("authority", "") for r in answered), "")
         # each department speaks in its own voice; a disagreement should read as one
         v.answer = " ".join(f"{r.dept.upper()}: {r.answer['answer'].strip()}" for r in answered if r.answer.get("answer"))
 
-        agreed, disputed, decides, precedence = self._positions(student, answered)
         if v.escalations or any(r.answer.get("escalate") for r in results):
             v.kind = "ESCALATED"
             # E-xx ids are per box (college E-02 is not ISO's E-02): read each trigger's text from the
@@ -286,14 +290,16 @@ class Advocate:
             return box.facts[basis].authority
         return box.highest_authority(option.get("cites", []))
 
-    def _positions(self, student: Box, answered: list[DeptResult]) -> tuple[list[str], list[str], list[str], list[str]]:
+    def _positions(self, student: Box, answered: list[DeptResult]) -> tuple[list[str], list[str], list[str], list[str], set[str]]:
         """Compare departments by the option each one recommends (its first), by `units`. The
         student's preferences rank the pooled menu later; they do not decide whether two offices
         disagree. The authority behind a position is the level of the rule it rests on, so a campus
         office quoting a federal rule in passing does not outrank the office that administers it.
         Equal authority -> disputed; otherwise authority_order decides. Returns (agreed, disputed,
-        decides: the departments in a dispute, precedence: who outranked whom)."""
+        decides: the departments in a dispute, precedence: who outranked whom, outranked: the
+        departments whose position lost to a higher authority)."""
         agreed, disputed, decides, precedence = [], [], [], []
+        outranked: set[str] = set()
         best = {}
         for r in answered:
             opts = [o for o in r.answer.get("options", []) if isinstance(o.get("units"), (int, float))]
@@ -313,11 +319,12 @@ class Advocate:
                     decides += [a.upper(), b.upper()]
                 else:
                     winner, loser = (a, b) if ra < rb else (b, a)
+                    outranked.add(loser)
                     precedence.append(f"{winner.upper()} wins by authority_order ({best[winner][1]}) over {loser.upper()} ({best[loser][1]})")
                     agreed.append(f"{winner.upper()} position stands: {best[winner][2]}")
         if len(answered) == 1 and not agreed and not disputed:
             agreed.append(f"{answered[0].dept.upper()} is the only department in scope")
-        return agreed, disputed, sorted(set(decides)), precedence
+        return agreed, disputed, sorted(set(decides)), precedence, outranked
 
     # -- writing back ----------------------------------------------------------------
     def write(self, v: Verdict) -> None:
