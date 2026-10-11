@@ -59,7 +59,7 @@ quarter_number | no | ask | ask | ask
 units | ask | ask | ask | ask
 hours | ask | ask | ask | ask
 gpa | no | ask | ask | ask
-visa | yes | no | no | ask
+visa | yes | no | no | yes
 rcl_on_file | yes | no | ask | no
 first_quarter | yes | no | no | no
 final_quarter | ask | ask | ask | ask
@@ -67,8 +67,8 @@ expected_graduation | ask | ask | ask | ask
 quarters_to_graduation | ask | ask | ask | no
 days_to_deadline | yes | yes | yes | yes
 days_to_i20_end | yes | no | no | no
-aid | no | no | ask | ask
-aid_type | never | no | no | ask
+aid | no | no | ask | yes
+aid_type | never | no | no | yes
 part_time_program | ask | ask | ask | ask
 
 ## 4. Session log

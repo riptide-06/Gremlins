@@ -28,7 +28,7 @@ F-09 | Satisfactory Academic Progress must be maintained to remain eligible for 
 F-10 | SAP standards commonly applied: cumulative GPA of at least 2.0, completion of at least 67 percent of attempted credits, and a maximum timeframe of 150 percent of the program length. | federal | UCSC undergraduate SAP policy PDF, not fetched | no
 F-11 | The Part-Time Program halves the Tuition Fee and, if applicable, Nonresident Supplemental Tuition; other quarterly fees are not reduced, and the program does not apply in summer. | campus | https://registrar.ucsc.edu/enrollment/part-time-program | yes
 F-12 | Cancelling the Part-Time Program after approval may revise aid only as funding permits. The office can be reached at (831) 459-2963. | campus | https://registrar.ucsc.edu/enrollment/part-time-program | yes
-F-13 | International students on F-1 visas are not eligible for federal or state need-based aid (FAFSA, Pell, Cal Grant) but may hold UCSC merit scholarships and department awards. | federal | general Title IV eligibility rule, not confirmed on a UCSC page | no
+F-13 | International students holding an F-1/F-2, J-1/J-2, G, H, or other temporary nonimmigrant visa typically are not eligible for federal, state, or university need-based financial aid (FAFSA, Pell, Cal Grant, UC grants); they may be considered for the Dean's Award, the Regents Scholarship, and private loans with a qualified U.S. co-signer. A student with no aid on file has no aid consequence from a unit change. | campus | https://financialaid.ucsc.edu/apply-for-aid/international-students.html | yes
 F-14 | Office practice: UCSC merit scholarships administered by the office require full-time enrollment (12 credits) each quarter unless the Part-Time Program is approved; a quarter below 12 credits forfeits that quarter's disbursement. | department | office practice, not confirmed on a published page | no
 
 ## 2. Precedence
@@ -43,7 +43,7 @@ Q-01 | What happens to my aid if I drop to 9 units? | At the add/drop/swap deadl
 Q-02 | Do I lose everything below 6 units? | At 5 or fewer credits you keep 25 percent of Pell and none of the other aid [F-02], and awards are not paid in full below 6 credits [F-01].
 Q-03 | If I withdraw this quarter, do I owe money? | Before 60 percent of the term, you keep aid only for the days attended and may be billed for the rest [F-06] [F-07]. After 60 percent you keep it all [F-06].
 Q-04 | Does the part-time program hurt my aid? | No net effect on your account: fees and aid are adjusted together, and approval after the quarter begins applies retroactively [F-05] [F-11].
-Q-05 | I am an international student. What aid applies to me? | Federal and state need-based aid do not apply to F-1 students; UCSC merit scholarships and department awards can [F-13]. Office practice is that merit scholarships require 12 credits unless the Part-Time Program is approved [F-14].
+Q-05 | I am an international student. What aid applies to me? | Federal, state, and university need-based aid do not apply on an F-1 or J-1 visa; the Dean's Award, the Regents Scholarship, and private loans with a U.S. co-signer can [F-13]. If you hold no aid, a unit change has no aid consequence at all [F-13]. Office practice is that merit scholarships require 12 credits unless the Part-Time Program is approved [F-14].
 Q-06 | Is there summer aid? | Yes, with at least 6 credits per session; summer withdrawals are prorated by days attended [F-08].
 
 ## 4. Escalation

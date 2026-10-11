@@ -12,7 +12,11 @@ falls back to `<name>.example.md` only when `<name>.md` is missing.
 
 Department metadata that the advocate reads: `department:` (the id), `name:`,
 `topics:` (a regex; the department is asked when the question matches it, every
-department is asked when nothing matches), `authority_order:`.
+department is asked when nothing matches), `serves:` (who the office is for, as a
+condition over the student's own fields in the `E-xx` grammar, for example
+`major ~ game design|computational media`; the advocate checks it against the student
+box without sharing anything, and a field the student has not filled in counts as
+served), `authority_order:`.
 
 ## Line grammar (parsed by `box.py`)
 

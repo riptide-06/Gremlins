@@ -271,3 +271,23 @@ def test_outranked_office_gets_a_reconsider_turn_too(store):
     assert v.kind == "CONVERGED" and v.best["units"] == 12 and "precedence" not in v.brief   # they now agree outright
     assert [(t["dept"], t["round"], t.get("stance")) for t in v.transcript][2:] == [("iso", 3, "hold"), ("registrar", 3, "agree")]
     assert v.brief["deliberation"] == ["ISO hold", "REGISTRAR agree"]
+
+
+def test_serves_keeps_a_major_office_out_of_another_majors_question(store):
+    from advocate import serves
+    from box import parse_box
+    # the registrar box serves game-design majors only; this student's major is TIM
+    text = store.load("iso").text.replace("\n", "\nserves: major ~ game design|computational media\n", 1)
+    store.write("registrar", text)
+    store.set_field("student", "major", "Technology and Information Management")
+    student = store.load("student")
+    assert serves("major ~ game design|computational media", student) is False
+    assert serves("", student) is True
+    assert serves("quarters_to_graduation <= 2", student) is True     # field not filled in: cannot tell, so consulted
+    iso, _ = scripted_dept("iso", store, [position(12, "Twelve [F-01].")])
+    reg, _ = scripted_dept("registrar", store, [position(6, "Six [F-07].", cites=("F-07",))])
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s26")
+    assert [r.dept for r in v.depts] == ["iso"]
+    store.set_field("student", "major", "Computer Science: Computer Game Design")
+    v = Advocate(store=store, depts={"iso": iso, "registrar": reg}).ask_sync("How few units can I take?", "s27")
+    assert [r.dept for r in v.depts] == ["iso", "registrar"]
