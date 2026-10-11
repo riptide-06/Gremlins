@@ -53,7 +53,8 @@ Department boxes never go there; they are policy and stay on the server.
 **Laptop, everything local:**
 
 ```sh
-uv sync && uv run pytest -q                       # 87 tests, no network
+uv sync && uv run pytest -q                       # 154 tests, no network
+uv run preflight.py --live                        # keys, boxes, cache, ports, git, one call per model
 uv run demo.py                                    # the six judge questions, four gremlins, fresh copy of the boxes
 uv run eval.py                                    # ten cases: gremlins vs one-call baseline
 uv run mcp_server.py                              # the advocate over MCP (stdio) for Claude Desktop / Claude Code
