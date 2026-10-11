@@ -72,9 +72,9 @@ def test_brain_failure_gives_safe_empty_answer_but_still_escalates(store):
 
 def test_malformed_model_output_is_clamped(store):
     raw = good_answer(confidence=7, options=[{"option": "x", "conditions": [], "cites": ["F-01"], "units": "12"}, "junk"],
-                      needs=["a", "a", "", 3], scope="weird")
+                      needs=["hours", "Hours", "current_on_campus_hours", "", 3, "issp_approval", "nonsense_field"], scope="weird")
     out = validate_answer(raw, store.load("iso"), [])
-    assert out["confidence"] == 1.0 and out["needs"] == ["a"] and out["scope"] == "out_of_scope"
+    assert out["confidence"] == 1.0 and out["needs"] == ["hours", "rcl_on_file"] and out["scope"] == "out_of_scope"
     assert len(out["options"]) == 1 and out["options"][0]["units"] is None
 
 

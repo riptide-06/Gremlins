@@ -262,6 +262,9 @@ async def test_judge_mode_chat_and_api(tmp_path):
         assert (await http.post("/api/reset", json={}, headers=headers)).json()["ok"] is True
         box_after = (await http.get("/api/box", headers=headers)).json()["box"]
         assert "SESSION" not in box_after and "APPROVED" not in box_after and "days_to_deadline: 9" in box_after
+        from box import MarkdownBoxStore as _Store
+        for dept in ("iso", "cmpm", "college", "finaid"):   # department session logs are reset too
+            assert "SESSION" not in _Store(tmp_path).load(dept).text
         # a signed-in student with no Google account never touched Firestore
         assert not hasattr(app.state, "firestore_touched")
 

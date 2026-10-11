@@ -78,9 +78,9 @@ def test_ask_student_when_need_is_an_ask_field(store):
 
 
 def test_ask_student_when_box_lacks_the_field(store):
-    adv, _ = advocate_with(store, answer(needs=["degree_audit_units"], options=[]))
+    adv, _ = advocate_with(store, answer(needs=["days_to_deadline"], options=[]))   # a vocabulary field this box lacks
     v = adv.ask_sync("q", "s5")
-    assert v.kind == "ASK_STUDENT" and v.ask == ["degree_audit_units"]
+    assert v.kind == "ASK_STUDENT" and v.ask == ["days_to_deadline"]
 
 
 def test_approval_unblocks_and_is_read_fresh(store):

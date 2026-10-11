@@ -119,7 +119,7 @@ def run_eval(brain: Brain, cases: list[Case] = CASES, root: Path | None = None,
 
 def format_table(result: dict) -> str:
     s = result["summary"]
-    lines = ["condition | correct outcome | uncited claims | student fields that left the box (protected)",
+    lines = ["condition | correct outcome | uncited claims (gremlin: deleted by the wall before the student saw them; baseline: shown) | student fields that left the box (protected)",
              "--- | --- | --- | ---"]
     for cond in ("gremlin", "baseline"):
         c = s[cond]

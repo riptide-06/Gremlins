@@ -7,7 +7,7 @@ keeps history, never sees a previous call, and returns None when the model
 could not produce JSON that conforms to `schema` within one retry.
 
 LiteLLMBrain: groq/openai/gpt-oss-120b, then nvidia_nim/nvidia/nemotron-3-super-120b-a12b,
-then gemini/gemini-2.5-flash (GREMLIN_MODELS overrides), temperature 0, JSON mode.
+then gemini/gemini-3.8-flash (GREMLIN_MODELS overrides), temperature 0, JSON mode.
 CachedBrain: replay cache keyed by the prompt hash, so demos are instant and identical.
 ScriptedBrain: canned answers for tests and offline demos.
 BayleafBrain: TODO stub for the Bayleaf runtime.
@@ -21,7 +21,7 @@ from typing import Any, Protocol
 
 PRIMARY = "groq/openai/gpt-oss-120b"
 FALLBACK = "nvidia_nim/nvidia/nemotron-3-super-120b-a12b"
-THIRD = "gemini/gemini-2.5-flash"
+THIRD = "gemini/gemini-3.8-flash"
 MAX_TOKENS = 2048
 CACHE_DIR = Path(__file__).resolve().parent / "out" / "cache"
 

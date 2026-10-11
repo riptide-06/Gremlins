@@ -111,3 +111,19 @@ def test_matching_escalations(store):
     assert ids({"units": "9", "final_quarter": "yes", "rcl_on_file": "no"}) == ["E-02", "E-03"]
     assert ids({"units": "16"}, "I need a medical reduced load") == ["E-01"]
     assert ids({"hours": "25"}) == ["E-04"]
+
+
+def test_field_names_normalize_onto_the_student_vocabulary():
+    from box import STUDENT_FIELDS, normalize_field
+    assert normalize_field("hours") == "hours"
+    assert normalize_field("current_on_campus_hours") == "hours"
+    assert normalize_field("Current On-Campus Hours") == "hours"
+    assert normalize_field("f1_status") == "visa"
+    assert normalize_field("issp_approval") == "rcl_on_file"
+    assert normalize_field("part_time_program_approved") == "part_time_program"
+    assert normalize_field("degree_audit_units") == "units"
+    assert normalize_field("CMPM_120_modality") is None
+    assert normalize_field("target_units") == "units"      # harmless: units is already shared, so no ask results
+    assert normalize_field("desired_units") == "units"
+    assert normalize_field("") is None and normalize_field("ramen_preference") is None
+    assert all(normalize_field(f) == f for f in STUDENT_FIELDS)

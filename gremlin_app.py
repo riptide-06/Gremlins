@@ -363,7 +363,8 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
         request.session.clear()
         request.session.update({"uid": DEMO_UID, "csrf": secrets.token_urlsafe(32)})
         if not getattr(request.app.state, "demo_pristine", None) and boxes.exists(settings.demo_box):
-            request.app.state.demo_pristine = boxes.load(settings.demo_box).text   # for /api/reset between judges
+            # snapshot the student box and the department boxes (their session logs) for /api/reset between judges
+            request.app.state.demo_pristine = {name: boxes.load(name).text for name in (settings.demo_box, *depts) if boxes.exists(name)}
         emit("demo_login")
         return RedirectResponse("/chat", status_code=303)
 
@@ -375,9 +376,10 @@ def create_app(settings=None, store=None, boxes=None, brain=None):
         pristine = getattr(request.app.state, "demo_pristine", None)
         if uid != DEMO_UID or not pristine:
             return JSONResponse({"ok": False, "error": "reset is only for the demo student"}, status_code=400)
-        await asyncio.to_thread(boxes.write, settings.demo_box, pristine)
+        for name, text in pristine.items():
+            await asyncio.to_thread(boxes.write, name, text)
         emit("demo_reset")
-        return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True, "restored": sorted(pristine)})
 
     async def chat(request):
         if not request.session.get("uid"):

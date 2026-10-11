@@ -20,6 +20,49 @@ BASE = Path(__file__).resolve().parent
 DEFAULT_ROOT = BASE / "docs" / "boxes"
 PERMISSION_VALUES = {"yes", "no", "ask", "never"}
 
+# The student profile vocabulary (docs/boxes/student.template.md, docs/CUBBY.md). A department
+# may only ask for these; anything else a model invents is dropped before it can stall a question.
+STUDENT_FIELDS = (
+    "name", "email", "college", "level", "major", "major_declared", "quarter_number", "units", "hours",
+    "gpa", "visa", "rcl_on_file", "first_quarter", "final_quarter", "expected_graduation",
+    "quarters_to_graduation", "days_to_deadline", "days_to_i20_end", "aid", "aid_type", "part_time_program",
+)
+_FIELD_SYNONYMS = {
+    "units": ("credits", "current_units", "enrolled_units", "units_this_quarter", "current_credits", "enrollment", "course_load", "unit_count", "credit_count"),
+    "hours": ("work_hours", "weekly_hours", "on_campus_hours", "current_on_campus_hours", "current_hours", "hours_per_week", "job_hours", "employment_hours", "current_work_hours"),
+    "visa": ("visa_status", "visa_type", "immigration_status", "f1_status", "f_1_status", "status", "international"),
+    "gpa": ("cumulative_gpa", "ucsc_gpa", "term_gpa", "grade_point_average"),
+    "major_declared": ("declared", "declared_major", "declaration_status", "major_declaration", "is_declared"),
+    "rcl_on_file": ("rcl", "rcl_status", "rcl_approved", "reduced_course_load", "rcl_authorization", "issp_approval", "issp_rcl_approval"),
+    "part_time_program": ("part_time", "part_time_status", "part_time_program_approved", "part_time_approval", "official_part_time_program"),
+    "final_quarter": ("last_quarter", "final_term", "graduating_this_quarter", "is_final_quarter"),
+    "first_quarter": ("first_term", "is_first_quarter", "new_student"),
+    "quarter_number": ("quarter", "current_quarter", "quarters_completed", "quarters_enrolled", "term_number"),
+    "expected_graduation": ("graduation_date", "graduation_quarter", "expected_grad", "program_end_date", "i20_end_date"),
+    "quarters_to_graduation": ("quarters_left", "quarters_remaining", "terms_remaining"),
+    "days_to_deadline": ("deadline", "add_drop_deadline", "days_until_deadline", "drop_deadline"),
+    "days_to_i20_end": ("i20_days_left", "days_to_program_end", "program_end"),
+    "aid": ("financial_aid", "has_aid", "receives_aid", "aid_status", "scholarship"),
+    "aid_type": ("scholarship_type", "aid_kind", "grant_type"),
+    "college": ("college_affiliation", "residential_college"),
+    "level": ("degree_level", "student_level", "program_level", "undergraduate"),
+    "major": ("program", "degree", "field_of_study"),
+}
+_SYNONYM_INDEX = {alias: field for field, aliases in _FIELD_SYNONYMS.items() for alias in aliases}
+
+
+def normalize_field(name: str) -> str | None:
+    """Map a model-written field name onto the vocabulary, or None if it is not a student field."""
+    key = re.sub(r"[^a-z0-9]+", "_", str(name).strip().lower()).strip("_")
+    if key in STUDENT_FIELDS:
+        return key
+    if key in _SYNONYM_INDEX:
+        return _SYNONYM_INDEX[key]
+    for field_name in STUDENT_FIELDS:            # "current_units_enrolled" -> units
+        if re.search(rf"(^|_){re.escape(field_name)}(_|$)", key):
+            return field_name
+    return None
+
 _SECTION = re.compile(r"^##\s+(\d+)\.\s*(.+?)\s*$")
 _KV = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
 _ID_LINE = re.compile(r"^([FPQE])-(\d+[A-Za-z0-9]*)\s*\|\s*(.*)$")
