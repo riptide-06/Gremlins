@@ -689,7 +689,7 @@ SendMessage {"session_id","question","context"}</pre>
       if (v.verdict === 'DISPUTED') html += '<div class="why"><strong style="font-size:12px">Why this is disputed, not averaged</strong><span>Both positions rest on rules of the same rank, so no precedence applies. Both are kept in your cubby. ' + (b.decides && b.decides.length ? 'Who decides: you, with ' + esc(b.decides.join(' and ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'ESCALATED') html += '<div class="why"><strong style="font-size:12px">Why a person has to look at this</strong><span>' + esc((b.resolve || []).join(' ') || 'A trigger in the policy box matched your situation.') + (b.decides && b.decides.length ? ' Decides: ' + esc(b.decides.join(', ')) + '.' : '') + '</span></div>';
       if (v.verdict === 'CONVERGED' && b.precedence && b.precedence.length) html += '<div class="why"><strong style="font-size:12px">Precedence applied</strong><span>' + esc(b.precedence.join('; ')) + (b.agreed && b.agreed.length ? ' ' + esc(b.agreed.join('; ')) : '') + '</span></div>';
-      if (v.deliberated) html += '<div class="why" style="border-left-color:var(--blue)"><strong style="font-size:12px">How the offices got here</strong><span>' + ((b.deliberation && b.deliberation.length) ? esc(b.deliberation.join(' · ')) + '. ' : 'No office named another, and nobody disagreed at equal authority, so there was nothing to argue about. ') + 'Only cited policy crossed between offices; your fields went to each one by your own rules.</span></div>';
+      if (v.deliberated) html += '<div class="why" style="border-left-color:var(--blue)"><strong style="font-size:12px">How the offices got here</strong><span>' + ((b.deliberation && b.deliberation.length) ? esc(b.deliberation.join(' · ')) + '. ' : (v.verdict === 'ASK_STUDENT' ? 'The discussion waits until you answer the question above; the offices only argue over a complete picture. ' : 'Only one office had a position, so there was nobody to answer. ')) + 'Only cited policy crossed between offices; your fields went to each one by your own rules.</span></div>';
       if (v.options && v.options.length) html += '<div style="display:flex;flex-direction:column;gap:4px;font-size:13px"><strong style="font-size:12px">Your options, ranked by your preferences</strong>' + v.options.map(function(o){ var attrs = ['units','hours','weeks'].filter(function(k){ return o[k] != null; }).map(function(k){ return k + ' ' + o[k]; }).join(', '); return '<span>' + o.rank + '. ' + esc(o.option) + ' <span class="chip">' + esc(shortDept(o.dept)) + '</span> ' + cites(o.cites) + (attrs ? ' <span class="muted">(' + esc(attrs) + ')</span>' : '') + (o.conditions && o.conditions.length ? '<div class="muted" style="font-size:12px">if: ' + esc(o.conditions.join('; ')) + '</div>' : '') + '</span>'; }).join('') + '</div>';
       if (v.escalations && v.escalations.length) html += '<span class="receipt">triggers fired in code: ' + cites((b.triggers && b.triggers.length) ? b.triggers.map(function(t){ return t.split(':')[0]; }) : v.escalations) + '</span>';
     }
@@ -719,7 +719,7 @@ SendMessage {"session_id","question","context"}</pre>
   }
   function turnLabel(t){
     if (t.kind === 'referral') return 'joins · round 2 · asked in by ' + (t.invited_by || []).map(shortDept).join(', ');
-    if (t.kind === 'reconsider') return 'reconsiders · round 3';
+    if (t.kind === 'reconsider') return 'replies to ' + ((t.heard && t.heard.length) ? t.heard.map(shortDept).join(', ') : 'the others') + ' · round 3';
     return 'position · round 1';
   }
   function renderTurn(t){
@@ -735,7 +735,7 @@ SendMessage {"session_id","question","context"}</pre>
     var room = g.querySelector('#room-live'), wait = g.querySelector('#room-wait'); room.id = ''; wait.id = '';
     var got = {verdict: null, error: null};
     var onEvent = function(kind, data){
-      if (kind === 'turn') { room.appendChild(renderTurn(data)); wait.querySelector('.muted').textContent = data.round === 1 ? 'listening for referrals, then a reconsider round if two offices disagree at equal authority' : (data.round === 2 ? 'an office joined; checking whether anyone disagrees at equal authority' : 'reconsider round in progress'); window.scrollTo(0, document.body.scrollHeight); }
+      if (kind === 'turn') { room.appendChild(renderTurn(data)); wait.querySelector('.muted').textContent = data.round === 1 ? 'round 2: any office named by another joins; then each office answers the others' : (data.round === 2 ? 'round 3: each office answers the others' : 'round 3: the offices are answering each other'); window.scrollTo(0, document.body.scrollHeight); }
       else if (kind === 'verdict') got.verdict = data;
       else if (kind === 'error') got.error = data;
     };

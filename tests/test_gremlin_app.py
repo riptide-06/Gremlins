@@ -160,7 +160,8 @@ async def test_demo_word_streams_the_offices_turns(campus):
         # the word demo turns deliberation on and is dropped from the question
         v = (await http.post("/api/ask", json={"question": "demo: can I drop to 12 units?"}, headers=API)).json()
         assert v["deliberated"] is True and v["question"] == "can I drop to 12 units?"
-        assert [t["kind"] for t in v["transcript"]] and all(t["round"] == 1 for t in v["transcript"])
+        kinds = [t["kind"] for t in v["transcript"]]
+        assert kinds[:4] == ["position"] * 4 and "reconsider" in kinds      # every office answers the others
         # the same over server-sent events: turns as they happen, then the verdict
         async with http.stream("POST", "/api/ask_stream", json={"question": "Can I drop to 12 units?"}, headers=API) as r:
             assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")

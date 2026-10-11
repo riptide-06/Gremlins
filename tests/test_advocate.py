@@ -229,8 +229,10 @@ def test_referral_pulls_a_named_office_into_round_two(store):
     v = adv.ask_sync("How few units can I take?", "s21", deliberate=True)
     # finaid is not an office this student's permissions table knows (nor one this advocate runs): ignored
     assert [r.dept for r in v.depts] == ["iso", "registrar"] and v.kind == "CONVERGED"
-    assert [(t["dept"], t["round"], t["kind"]) for t in v.transcript] == [("iso", 1, "position"), ("registrar", 2, "referral")]
-    assert v.transcript[1]["invited_by"] == ["iso"] and v.brief["deliberation"] == ["REGISTRAR joined at ISO's request"]
+    # round 1, the referral, then both answer each other (they agree, and say so)
+    assert [(t["dept"], t["round"], t["kind"]) for t in v.transcript] == [("iso", 1, "position"), ("registrar", 2, "referral"), ("iso", 3, "reconsider"), ("registrar", 3, "reconsider")]
+    assert v.transcript[1]["invited_by"] == ["iso"] and v.brief["deliberation"][0] == "REGISTRAR joined at ISO's request"
+    assert v.transcript[2]["heard"] == ["registrar"] and v.transcript[3]["heard"] == ["iso"]
     prompt = reg_brain.calls[0]["user"]
     assert "other offices' positions" in prompt and "ISO (federal): 12 units [F-01]" in prompt and "reconsider" not in prompt
     assert "Riya" not in prompt and "Asha" not in prompt

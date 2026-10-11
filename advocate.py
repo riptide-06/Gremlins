@@ -300,15 +300,13 @@ class Advocate:
                     r.invited_by = by
                     say(r, 2, "referral", invited_by=by)
                 results += joined
-            # round 3: reconsider. The offices whose positions differ (a dispute at equal authority,
-            # or one outranked by another) hear each other's cited position once. Offices that
-            # already agree are left alone.
-            agreed, disputed, decides, precedence, outranked = self._positions(student, [x for x in results if x.answer.get("answer") or x.answer.get("options")])
-            contested = {x.lower() for x in decides} | set(outranked)
-            for line in precedence:                      # "X wins by authority_order (...) over Y (...)"
-                contested.add(line.split(" wins by", 1)[0].strip().lower())
-            parties = [r.dept for r in results if r.dept in contested and r.dept in self.depts]
-            if len(parties) >= 2:
+            # round 3: the discussion. Every office that took a position hears the others' cited
+            # positions once and answers them: hold, revise, or agree, with its own box as the reason.
+            # Nobody is asked to reconsider when the student still has to supply a field (the verdict
+            # would be ASK_STUDENT either way) or when only one office had anything to say.
+            spoke = [r for r in results if (r.answer.get("answer") or r.answer.get("options")) and not r.ask and r.dept in self.depts]
+            parties = [r.dept for r in spoke]
+            if len(parties) >= 2 and not any(r.ask for r in results):
                 before = {r.dept: r for r in results}
                 revised = list(await asyncio.gather(*[
                     self.consult(d, student, question, session_id, declined, reconsider=True,
@@ -323,7 +321,7 @@ class Advocate:
                     else:
                         r = old
                         r.stance = "hold"
-                    say(r, 3, "reconsider", stance=r.stance)
+                    say(r, 3, "reconsider", stance=r.stance, heard=[o for o in parties if o != r.dept])
         verdict = self.decide(student, question, session_id, results)
         verdict.transcript, verdict.deliberated = transcript, deliberate
         if deliberate:

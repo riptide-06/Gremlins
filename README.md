@@ -40,8 +40,8 @@ and ask the first question again. *Reset the demo student* puts everything back.
 deliberate in the open, streamed turn by turn. Round 1: every office in scope answers at once,
 none sees another. Round 2: an office whose box says another office must weigh in (`refers`,
 for example a P-xx line naming financial aid) pulls it in, with its own cited position in view.
-Round 3: offices whose positions differ hear each other's cited position once and say whether
-their box makes them hold, revise, or agree. Agreement after that is CONVERGED with the exchange
+Round 3: every office that took a position hears the others' cited positions once and answers
+them: hold, revise, or agree, with its own box as the reason. Agreement after that is CONVERGED with the exchange
 recorded; disagreement at equal authority stays DISPUTED, kept rather than averaged. Only cited
 policy ever crosses between offices; the student's fields go to each office by the student's own
 rules, and no office sees what another office received. Same thing over MCP: `ask(question,
