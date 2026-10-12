@@ -388,7 +388,7 @@ async def test_landing_discovery_to_documented_pairing_and_hello(system, monkeyp
     app = create_app(system.settings, system.repo, system.drive)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url=origin) as http:
         root = await http.get(origin)
-        assert root.headers["content-security-policy"] == "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+        assert root.headers["content-security-policy"] == "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; frame-src https://www.youtube-nocookie.com"
         links = Links()
         links.feed(root.text)
         # One visible, meaningful agent navigation link, also available to plain fetches.
@@ -645,7 +645,14 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
             for owner in (A, B, ADMIN):
                 assert system.user(owner)["folder"] not in response.text
         assert (await http.post("/a2a", json={"method": "SendMessage"})).status_code == 401
-        landing = (await http.get("/")).text
+        landing_response = await http.get("/")
+        landing = landing_response.text
+        assert 'src="https://www.youtube-nocookie.com/embed/2-IxoLteAt0"' in landing
+        assert landing.index('<iframe') < landing.index('<h2>Get started</h2>')
+        assert 'title="Campus Cubbies introduction"' in landing
+        assert '<figcaption>SF Tech Week Hackathon @ UCSC SVC, October 11, 2026</figcaption>' in landing
+        assert 'referrerpolicy="strict-origin-when-cross-origin"' in landing
+        assert "frame-src https://www.youtube-nocookie.com" in landing_response.headers["content-security-policy"]
         assert "Give your agent this address" in landing and system.settings.url in landing
         assert 'href="https://chat.bayleaf.dev/?model=basic&amp;tools=lathe&amp;q=Help%20me%20set%20up%20my%20Campus%20Cubby.%20Start%20with%20the%20public%20agent%20guide%20at%20https%3A%2F%2Fcubby.bayleaf.dev%2FSKILL.md%20We%20trust%20BayLeaf%20inference.&amp;submit=false">Try Cubbies via Bayleaf Chat</a>' in landing
         assert '<details><summary>Privacy and data protection</summary>' in landing
@@ -682,6 +689,8 @@ async def test_public_http_guards_csrf_and_pairing(system, caplog):
         assert pending.json() == {"error": "authorization_pending"}
         assert (await http.post("/auth/token", data={"user_code": pairing["user_code"], "device_code": pairing["device_code"]})).json() == {"error": "slow_down"}
         connection = await http.get("/connect?code=" + pairing["user_code"])
+        assert "frame-src" not in connection.headers["content-security-policy"]
+        assert '<iframe' not in connection.text
         # OAuth starts via an ordinary link after the same-origin POST completes.
         assert "form-action 'self';" in connection.headers["content-security-policy"]
         assert "connect-src 'self';" in connection.headers["content-security-policy"]

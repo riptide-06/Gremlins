@@ -378,11 +378,13 @@ def page(title, body, discovery=False):
         + discovery_links +
         '<style>html{background:#fff;color-scheme:light}body{font:17px system-ui;max-width:620px;margin:12vh auto;padding:24px;line-height:1.6;color:#193c2c;overflow-wrap:anywhere}button{font:inherit}blockquote{margin:16px 0;padding:12px 18px;border-left:3px solid #34a853;background:#f3f8f4}summary{cursor:pointer;padding:8px 0}code{overflow-wrap:anywhere}'
         'body.landing{max-width:1120px;margin:8vh auto}.landing-grid{display:grid;grid-template-columns:minmax(0,620px) minmax(260px,1fr);gap:64px;align-items:start}.landing-copy{min-width:0}.cubby-art{margin-top:100px;text-align:center}.cubby-art svg{display:block;width:100%;height:auto}.cubby-art p{font-size:16px;color:#52715f;margin:20px 0}'
+        '.cubby-film{margin:24px 0}.cubby-video{display:block;width:100%;aspect-ratio:16/9;border:0}.cubby-film figcaption{font-size:14px;color:#52715f;margin-top:8px}'
         '@media(max-width:800px){body.landing{margin:24px auto}.landing-grid{grid-template-columns:1fr;gap:16px}.cubby-art{grid-row:1;margin:0;display:flex;align-items:center;justify-content:center;gap:16px}.cubby-art svg{width:150px;flex-shrink:0}.cubby-art p{font-size:14px;text-align:left}.landing-copy h1{margin-top:12px}}'
         '</style><body' + (' class="landing"' if discovery else '') + '>' + content + '</body></html>',
         headers={**({"Link": '</SKILL.md>; rel="describedby"; type="text/markdown", </.well-known/agent-card.json>; rel="alternate"; type="application/json"'} if discovery else {}),
                    "Cache-Control": "no-store", "Referrer-Policy": "same-origin", "X-Content-Type-Options": "nosniff",
-                   "Content-Security-Policy": "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"})
+                   "Content-Security-Policy": "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+                   + ("; frame-src https://www.youtube-nocookie.com" if discovery else "")})
 
 
 def create_app(settings=None, repo=None, drive=None):
@@ -404,6 +406,10 @@ def create_app(settings=None, repo=None, drive=None):
                     'People you allow to contribute can add to your cubby, but they can’t peek at what’s inside. '
                     'Your agents can organize incoming information however you see fit. There’s no magic here, or even any AI running in Campus Cubbies: '
                     'use whatever agent tools you like to manage what’s simply one special folder on your UCSC Google Drive called <strong>My Cubby</strong>.</p>'
+                    '<figure class="cubby-film"><iframe class="cubby-video" src="https://www.youtube-nocookie.com/embed/2-IxoLteAt0" '
+                    'title="Campus Cubbies introduction" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" '
+                    'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+                    '<figcaption>SF Tech Week Hackathon @ UCSC SVC, October 11, 2026</figcaption></figure>'
                     '<h2>Get started</h2><p>Give your agent this address:</p><blockquote>'
                      + escape(settings.url) + '</blockquote><p>Ask it to help you set up your campus cubby. It will guide you through connecting your UCSC account.</p>'
                      '<p><a href="/SKILL.md">Agents: start here to connect</a>.</p>'
